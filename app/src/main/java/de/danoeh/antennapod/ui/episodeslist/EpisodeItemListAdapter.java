@@ -3,6 +3,7 @@ package de.danoeh.antennapod.ui.episodeslist;
 import android.app.Activity;
 import android.view.ContextMenu;
 import android.view.InputDevice;
+import android.view.KeyEvent;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -118,6 +119,26 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
             return false;
         });
 
+        holder.itemView.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && holder.secondaryActionButton.isFocusable()
+                    && holder.secondaryActionButton.getVisibility() == View.VISIBLE) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    holder.secondaryActionButton.requestFocus();
+                }
+                return true;
+            }
+            return false;
+        });
+        holder.secondaryActionButton.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    holder.itemView.requestFocus();
+                }
+                return true;
+            }
+            return false;
+        });
+
         holder.itemView.setSelected(false);
         if (inActionMode()) {
             holder.itemView.setActivated(false);
@@ -147,6 +168,8 @@ public class EpisodeItemListAdapter extends SelectableAdapter<EpisodeItemViewHol
         holder.itemView.setOnCreateContextMenuListener(null);
         holder.itemView.setOnLongClickListener(null);
         holder.itemView.setOnTouchListener(null);
+        holder.itemView.setOnKeyListener(null);
+        holder.secondaryActionButton.setOnKeyListener(null);
         holder.secondaryActionButton.setOnClickListener(null);
         holder.dragHandle.setOnTouchListener(null);
         holder.coverHolder.setOnTouchListener(null);

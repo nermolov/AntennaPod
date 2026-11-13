@@ -10,9 +10,9 @@ import androidx.annotation.IdRes;
 import androidx.appcompat.view.menu.MenuBuilder;
 import androidx.appcompat.widget.ListPopupWindow;
 import com.google.android.material.badge.BadgeDrawable;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.internal.ViewUtils;
 import com.google.android.material.navigation.NavigationBarView;
+import com.google.android.material.navigationrail.NavigationRailView;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
@@ -33,12 +33,12 @@ import java.util.List;
 public class BottomNavigation {
     private static final String TAG = "BottomNavigation";
 
-    private final BottomNavigationView bottomNavigationView;
+    private final NavigationRailView bottomNavigationView;
     private final Context context;
 
     private Disposable bottomNavigationBadgeLoader = null;
 
-    public BottomNavigation(BottomNavigationView bottomNavigationView) {
+    public BottomNavigation(NavigationRailView bottomNavigationView) {
         this.bottomNavigationView = bottomNavigationView;
         this.context = bottomNavigationView.getContext();
         ViewUtils.doOnApplyWindowInsets(bottomNavigationView, (view, insets, initialPadding) -> insets);
@@ -118,7 +118,8 @@ public class BottomNavigation {
 
         final ListPopupWindow listPopupWindow = new ListPopupWindow(context);
         listPopupWindow.setWidth((int) (250 * context.getResources().getDisplayMetrics().density));
-        listPopupWindow.setAnchorView(bottomNavigationView);
+        View moreView = bottomNavigationView.findViewById(R.id.bottom_navigation_more);
+        listPopupWindow.setAnchorView(moreView != null ? moreView : bottomNavigationView);
         listPopupWindow.setAdapter(new BottomNavigationMoreAdapter(context, popupMenuItems));
         listPopupWindow.setOnItemClickListener((parent, view, position, id) -> {
             int itemId = popupMenuItems.get(position).getItemId();
@@ -129,7 +130,9 @@ public class BottomNavigation {
             }
             listPopupWindow.dismiss();
         });
-        listPopupWindow.setDropDownGravity(Gravity.END | Gravity.BOTTOM);
+        listPopupWindow.setDropDownGravity(Gravity.START);
+        listPopupWindow.setHorizontalOffset(bottomNavigationView.getWidth());
+        listPopupWindow.setVerticalOffset(-(moreView != null ? moreView.getHeight() : 0));
         listPopupWindow.setModal(true);
         listPopupWindow.show();
     }

@@ -492,6 +492,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
     }
 
     public void loadFragment(Fragment fragment) {
+        boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
         FragmentManager fragmentManager = getSupportFragmentManager();
         // Clear all synchronously to avoid conflicting with predictive back gesture cancellation
         fragmentManager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
@@ -509,10 +510,23 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
             drawerLayout.closeDrawer(navDrawer);
         }
         updateMainBackCallbackEnabledState();
+        if (focusWasInContent) {
+            keepFocusInContent();
+        }
+    }
+
+    private void keepFocusInContent() {
+        View content = findViewById(R.id.main_content_view);
+        content.post(() -> {
+            if (!content.hasFocus()) {
+                content.requestFocus();
+            }
+        });
     }
 
     public void loadChildFragment(Fragment fragment, String navigationTag) {
         Objects.requireNonNull(fragment);
+        boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
         if (navigationTag != null && bottomNavigation != null) {
             bottomNavigation.updateSelectedItem(navigationTag);
         }
@@ -522,6 +536,9 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
                 .addToBackStack(null)
                 .commit();
         updateMainBackCallbackEnabledState();
+        if (focusWasInContent) {
+            keepFocusInContent();
+        }
     }
 
     public void loadChildFragment(Fragment fragment) {
@@ -680,9 +697,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         Snackbar snackbar;
         if (getBottomSheet().getState() == BottomSheetBehavior.STATE_EXPANDED) {
             snackbar = Snackbar.make(findViewById(android.R.id.content), event.message, Snackbar.LENGTH_LONG);
-            if (findViewById(R.id.bottomNavigationView).getVisibility() == View.VISIBLE) {
-                snackbar.setAnchorView(findViewById(R.id.bottomNavigationView));
-            }
         } else {
             snackbar = Snackbar.make(findViewById(R.id.main_content_view), event.message, Snackbar.LENGTH_LONG);
             if (findViewById(R.id.audioplayerFragment).getVisibility() == View.VISIBLE) {

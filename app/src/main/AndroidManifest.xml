@@ -26,10 +26,14 @@
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="false"/>
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false"/>
 
     <application
         android:name="de.danoeh.antennapod.PodcastApp"
         android:icon="@mipmap/ic_launcher"
+        android:banner="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:backupAgent=".storage.importexport.OpmlBackupAgent"
@@ -86,6 +90,7 @@
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
                 <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>
 

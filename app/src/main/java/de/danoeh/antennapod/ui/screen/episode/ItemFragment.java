@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.text.Layout;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -148,6 +149,17 @@ public class ItemFragment extends Fragment {
             });
         });
         registerForContextMenu(viewBinding.webvDescription);
+        viewBinding.webvDescription.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && !viewBinding.webvDescription.canScrollVertically(-1)) {
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    View target = viewBinding.butAction1.getVisibility() == View.VISIBLE
+                            ? viewBinding.butAction1 : viewBinding.butAction2;
+                    target.requestFocus();
+                }
+                return true;
+            }
+            return false;
+        });
         viewBinding.imgvCover.setOnClickListener(v -> openPodcast());
         viewBinding.butAction1.setOnClickListener(v -> {
             if (actionButton1 instanceof StreamActionButton && !UserPreferences.isStreamOverDownload()

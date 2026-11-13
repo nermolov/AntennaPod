@@ -46,11 +46,34 @@
           inherit (sdkArgs) buildToolsVersions;
         };
       };
+
+      emulatorTv = pkgs.androidenv.emulateApp {
+        name = "antennapod-tv-emulator";
+        platformVersion = "36";
+        abiVersion = "x86_64";
+        systemImageType = "android-tv";
+        deviceName = "tv";
+        androidUserHome = "$PWD/.android-nix";
+        androidAvdFlags = "-d tv_1080p";
+        configOptions = {
+          "hw.ramSize" = "4096";
+          "hw.keyboard" = "yes";
+        };
+        androidEmulatorFlags = "-gpu swiftshader_indirect -noaudio -no-snapshot-save -camera-back none";
+        sdkExtraArgs = {
+          inherit (sdkArgs) buildToolsVersions;
+        };
+      };
     in
     {
       packages.${system} = {
-        inherit androidSdk emulator;
+        inherit androidSdk emulator emulatorTv;
         default = emulator;
+      };
+
+      apps.${system}.emulator-tv = {
+        type = "app";
+        program = "${emulatorTv}/bin/run-test-emulator";
       };
 
       apps.${system}.emulator = {

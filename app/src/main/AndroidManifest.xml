@@ -187,6 +187,12 @@
         </activity>
 
         <activity
+            android:name=".ui.screen.playback.fullscreen.FullscreenPlayerActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
+            android:theme="@style/Theme.AntennaPod.Dark.NoTitle"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.screen.playback.video.Media3VideoPlayerActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize"
             android:supportsPictureInPicture="true"

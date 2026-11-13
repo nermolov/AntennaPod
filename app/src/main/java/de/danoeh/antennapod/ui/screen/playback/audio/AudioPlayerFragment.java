@@ -115,6 +115,8 @@ public class AudioPlayerFragment extends Fragment implements
         super.onCreateView(inflater, container, savedInstanceState);
         View root = inflater.inflate(R.layout.audioplayer_fragment, container, false);
         root.setOnTouchListener((v, event) -> true); // Avoid clicks going through player to fragments below
+        ((ViewGroup) root.findViewById(R.id.playerContent))
+                .setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         toolbar = root.findViewById(R.id.toolbar);
         toolbar.setTitle("");
         toolbar.setNavigationOnClickListener(v ->
@@ -567,6 +569,9 @@ public class AudioPlayerFragment extends Fragment implements
         float toolbarFadeProgress = Math.max(0.0f, Math.min(0.2f, slideOffset - 0.6f)) / 0.2f;
         toolbar.setAlpha(toolbarFadeProgress);
         toolbar.setVisibility(toolbarFadeProgress < 0.01f ? View.INVISIBLE : View.VISIBLE);
+        ViewGroup playerContent = getView().findViewById(R.id.playerContent);
+        playerContent.setDescendantFocusability(slideOffset > 0.0f
+                ? ViewGroup.FOCUS_AFTER_DESCENDANTS : ViewGroup.FOCUS_BLOCK_DESCENDANTS);
     }
 
     private static class AudioPlayerPagerAdapter extends FragmentStateAdapter {

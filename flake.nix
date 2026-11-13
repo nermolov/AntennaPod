@@ -41,7 +41,7 @@
           "hw.ramSize" = "4096";
           "hw.keyboard" = "yes";
         };
-        androidEmulatorFlags = "-gpu swiftshader_indirect -noaudio -no-snapshot-save -camera-back none";
+        androidEmulatorFlags = "-gpu swiftshader_indirect -no-snapshot-save -camera-back none";
         sdkExtraArgs = {
           inherit (sdkArgs) buildToolsVersions;
         };
@@ -59,7 +59,7 @@
           "hw.ramSize" = "4096";
           "hw.keyboard" = "yes";
         };
-        androidEmulatorFlags = "-gpu swiftshader_indirect -noaudio -no-snapshot-save -camera-back none";
+        androidEmulatorFlags = "-gpu swiftshader_indirect -no-snapshot-save -camera-back none";
         sdkExtraArgs = {
           inherit (sdkArgs) buildToolsVersions;
         };

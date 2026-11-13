@@ -1,10 +1,7 @@
+# Fork Notice
+This is an independent fork of AntennaPod. The upstream rules about keeping diffs minimal do not apply here: renaming, small cleanups and fixing nearby warnings are fine when they improve the code.
+
 # Coding Style
-Never fix any warnings outside the code you wrote.
-Only update existing code if necessary to fulfill the user request.
-In general, keep your changes as focused as possible and change the absolutely minimal number of lines.
-Never reorder or reorganize the code unless asked for by the user.
-Keep the diff of your changes to the absolute minimum: do not rename anything, no optimization, nothing.
-Just the bare instructions from the user.
 Do not ask for permission before making initial code changes.
 Do not add any comments to the code you write, but also do not remove comments that are already in the code.
 Whenever you add a user-visible string, add it to `:ui:i18n` so it can be translated. Do not start new strings files anywhere else.

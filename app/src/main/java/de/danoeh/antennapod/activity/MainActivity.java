@@ -305,6 +305,10 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
             } else if (state == BottomSheetBehavior.STATE_EXPANDED) {
                 onSlide(view, 1.0f);
                 bottomSheetBackPressedCallback.setEnabled(true);
+                View expandedPlayButton = findViewById(R.id.playerContent).findViewById(R.id.butPlay);
+                if (expandedPlayButton != null) {
+                    expandedPlayButton.requestFocus();
+                }
             } else if (state == BottomSheetBehavior.STATE_HIDDEN) {
                 PlaybackController.bindToMedia3Service(MainActivity.this, controller -> {
                     controller.clearMediaItems();
@@ -318,6 +322,9 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
 
         @Override
         public void onSlide(@NonNull View view, float slideOffset) {
+            ViewGroup mainContent = findViewById(R.id.main_content_view);
+            mainContent.setDescendantFocusability(slideOffset > 0.0f
+                    ? ViewGroup.FOCUS_BLOCK_DESCENDANTS : ViewGroup.FOCUS_AFTER_DESCENDANTS);
             AudioPlayerFragment audioPlayer = (AudioPlayerFragment) getSupportFragmentManager()
                     .findFragmentByTag(AudioPlayerFragment.TAG);
             if (audioPlayer == null) {

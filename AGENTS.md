@@ -1,5 +1,6 @@
 # Fork Notice
 This is an independent fork of AntennaPod. The upstream rules about keeping diffs minimal do not apply here: renaming, small cleanups and fixing nearby warnings are fine when they improve the code.
+This fork is focused on Android TV: prioritize D-pad/remote navigation, focus handling and a 10-foot UI over touch-first interactions.
 
 # Coding Style
 Do not ask for permission before making initial code changes.

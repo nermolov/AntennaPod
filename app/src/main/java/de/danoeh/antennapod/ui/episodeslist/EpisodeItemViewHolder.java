@@ -108,7 +108,6 @@ public class EpisodeItemViewHolder extends RecyclerView.ViewHolder {
 
         ItemActionButton actionButton = ItemActionButton.forItem(item);
         actionButton.configure(secondaryActionButton, secondaryActionIcon, activity);
-        secondaryActionButton.setFocusable(false);
 
         if (item.getMedia() != null) {
             bind(item.getMedia());

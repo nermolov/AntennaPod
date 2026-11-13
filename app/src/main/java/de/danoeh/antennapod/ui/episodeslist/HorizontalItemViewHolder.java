@@ -66,7 +66,6 @@ public class HorizontalItemViewHolder extends RecyclerView.ViewHolder {
         date.setContentDescription(DateFormatter.formatForAccessibility(item.getPubDate()));
         ItemActionButton actionButton = ItemActionButton.forItem(item);
         actionButton.configure(secondaryActionIcon, secondaryActionIcon, activity);
-        secondaryActionIcon.setFocusable(false);
 
         FeedMedia media = item.getMedia();
         if (media == null) {

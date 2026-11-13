@@ -95,6 +95,7 @@ public class ItemFragment extends Fragment {
     }
 
     private boolean itemsLoaded = false;
+    private int shownotesLinkIndex = -1;
     private long itemId;
     private FeedItem item;
     private String webviewData;
@@ -150,15 +151,14 @@ public class ItemFragment extends Fragment {
         });
         registerForContextMenu(viewBinding.webvDescription);
         viewBinding.webvDescription.setOnKeyListener((v, keyCode, event) -> {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP && !viewBinding.webvDescription.canScrollVertically(-1)) {
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    View target = viewBinding.butAction1.getVisibility() == View.VISIBLE
-                            ? viewBinding.butAction1 : viewBinding.butAction2;
-                    target.requestFocus();
-                }
+            if (keyCode != KeyEvent.KEYCODE_DPAD_UP && keyCode != KeyEvent.KEYCODE_DPAD_DOWN) {
+                return false;
+            }
+            if (event.getAction() != KeyEvent.ACTION_DOWN) {
                 return true;
             }
-            return false;
+            moveShownotesFocus(keyCode == KeyEvent.KEYCODE_DPAD_DOWN);
+            return true;
         });
         viewBinding.imgvCover.setOnClickListener(v -> openPodcast());
         viewBinding.butAction1.setOnClickListener(v -> {
@@ -232,6 +232,45 @@ public class ItemFragment extends Fragment {
         super.onStart();
         EventBus.getDefault().register(this);
         load();
+    }
+
+    private void moveShownotesFocus(boolean down) {
+        viewBinding.webvDescription.evaluateJavascript("document.links.length", value -> {
+            if (viewBinding == null) {
+                return;
+            }
+            int linkCount = 0;
+            try {
+                linkCount = Integer.parseInt(value);
+            } catch (NumberFormatException e) {
+                Log.d(TAG, "Could not read link count: " + value);
+            }
+            int target = shownotesLinkIndex + (down ? 1 : -1);
+            if (target >= 0 && target < linkCount) {
+                shownotesLinkIndex = target;
+                viewBinding.webvDescription.evaluateJavascript("document.links[" + target + "].focus();", null);
+            } else if (down && viewBinding.webvDescription.canScrollVertically(1)) {
+                viewBinding.webvDescription.scrollBy(0, viewBinding.webvDescription.getHeight() / 2);
+            } else if (!down && viewBinding.webvDescription.canScrollVertically(-1)) {
+                viewBinding.webvDescription.scrollBy(0, -viewBinding.webvDescription.getHeight() / 2);
+            } else {
+                shownotesLinkIndex = -1;
+                leaveShownotes(down);
+            }
+        });
+    }
+
+    private void leaveShownotes(boolean down) {
+        if (down) {
+            View next = viewBinding.webvDescription.focusSearch(View.FOCUS_DOWN);
+            if (next != null) {
+                next.requestFocus();
+            }
+        } else if (viewBinding.butAction1.getVisibility() == View.VISIBLE) {
+            viewBinding.butAction1.requestFocus();
+        } else {
+            viewBinding.butAction2.requestFocus();
+        }
     }
 
     @Override

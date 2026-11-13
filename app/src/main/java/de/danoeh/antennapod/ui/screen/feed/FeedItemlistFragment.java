@@ -2,6 +2,7 @@ package de.danoeh.antennapod.ui.screen.feed;
 
 import android.content.res.Configuration;
 import android.graphics.LightingColorFilter;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -10,6 +11,8 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
+import android.view.ViewTreeObserver;
 import android.widget.AdapterView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -99,6 +102,8 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
     private Disposable disposable;
     private FeedItemListFragmentBinding viewBinding;
     private Pair<Integer, Integer> scrollPosition = null;
+    private final ViewTreeObserver.OnGlobalFocusChangeListener focusChangeListener =
+            (oldFocus, newFocus) -> keepFocusedViewOnScreen(newFocus);
 
     /**
      * Creates new ItemlistFragment which shows the Feeditems of a specific
@@ -129,6 +134,7 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         viewBinding = FeedItemListFragmentBinding.inflate(inflater);
+        viewBinding.getRoot().getViewTreeObserver().addOnGlobalFocusChangeListener(focusChangeListener);
         viewBinding.toolbar.inflateMenu(R.menu.feedlist);
         viewBinding.toolbar.setOnMenuItemClickListener(this);
         viewBinding.toolbar.setOnLongClickListener(v -> {
@@ -252,11 +258,44 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
     public void onDestroyView() {
         super.onDestroyView();
 
+        ViewTreeObserver viewTreeObserver = viewBinding.getRoot().getViewTreeObserver();
+        if (viewTreeObserver.isAlive()) {
+            viewTreeObserver.removeOnGlobalFocusChangeListener(focusChangeListener);
+        }
         EventBus.getDefault().unregister(this);
         if (disposable != null) {
             disposable.dispose();
         }
         adapter.endSelectMode();
+    }
+
+    private void keepFocusedViewOnScreen(@Nullable View focused) {
+        if (focused == null || viewBinding == null) {
+            return;
+        }
+        if (viewBinding.recyclerView.findContainingItemView(focused) != null) {
+            if (!isFullyVisible(focused)) {
+                viewBinding.appBar.setExpanded(false, true);
+            }
+        } else if (isDescendantOf(focused, viewBinding.header.getRoot()) && !isFullyVisible(focused)) {
+            viewBinding.appBar.setExpanded(true, true);
+        }
+    }
+
+    private static boolean isFullyVisible(View view) {
+        Rect visibleRect = new Rect();
+        return view.getGlobalVisibleRect(visibleRect) && visibleRect.height() >= view.getHeight();
+    }
+
+    private static boolean isDescendantOf(View view, View ancestor) {
+        ViewParent parent = view.getParent();
+        while (parent != null) {
+            if (parent == ancestor) {
+                return true;
+            }
+            parent = parent.getParent();
+        }
+        return false;
     }
 
     @Override
@@ -531,7 +570,12 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
         viewBinding.header.butShowInfo.setVisibility(!isNotSubscribed ? View.VISIBLE : View.GONE);
         viewBinding.header.butFilter.setVisibility(showSettingsButtons ? View.VISIBLE : View.GONE);
         viewBinding.header.butShowSettings.setVisibility(showSettingsButtons ? View.VISIBLE : View.GONE);
+        boolean subscribeButtonAppears = isNotSubscribed
+                && viewBinding.header.butSubscribe.getVisibility() != View.VISIBLE;
         viewBinding.header.butSubscribe.setVisibility(isNotSubscribed ? View.VISIBLE : View.GONE);
+        if (subscribeButtonAppears) {
+            viewBinding.header.butSubscribe.requestFocus();
+        }
         viewBinding.header.butRestore.setVisibility(isArchived ? View.VISIBLE : View.GONE);
 
         if (isNotSubscribed && feed.getLastRefreshAttempt() < System.currentTimeMillis() - 1000L * 3600 * 24) {

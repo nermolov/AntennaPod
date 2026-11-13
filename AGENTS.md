@@ -9,6 +9,8 @@ Only ever edit the English strings file at `ui/i18n/src/main/res/values/strings.
 Never reference the full package name of classes directly in the code, use imports.
 
 # Running and Testing
+This fork provides a Nix flake. If `java` or `adb` are not on the path, run every command below inside the dev shell, for example `nix develop --command ./gradlew :app:assembleDebug`.
+For a headed emulator use `DISPLAY=:0 nix run .#emulator` (the emulator needs X11/Xwayland); on SELinux-enforcing hosts this requires `sudo setsebool -P selinuxuser_execheap 1`.
 After you are sure that the code is correct, ensure that there are no compilation errors (warnings are okay).
 To compile the code, use `./gradlew :app:assembleDebug`.
 You are already in the main directory of the project so there is no need to `cd` into the main folder.

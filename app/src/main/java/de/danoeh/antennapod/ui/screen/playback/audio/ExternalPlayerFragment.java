@@ -30,6 +30,7 @@ import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.ui.episodes.ImageResourceUtils;
 import de.danoeh.antennapod.ui.screen.playback.PlayButton;
+import de.danoeh.antennapod.ui.screen.playback.fullscreen.FullscreenPlayerActivity;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -71,7 +72,7 @@ public class ExternalPlayerFragment extends Fragment {
 
             if (currentMedia != null) {
                 if (currentMedia.getMediaType() == MediaType.AUDIO) {
-                    ((MainActivity) getActivity()).getBottomSheet().setState(BottomSheetBehavior.STATE_EXPANDED);
+                    startActivity(new Intent(getActivity(), FullscreenPlayerActivity.class));
                 } else {
                     Intent intent = PlaybackServiceInterface.getPlayerActivityIntent(getActivity(), currentMedia);
                     startActivity(intent);

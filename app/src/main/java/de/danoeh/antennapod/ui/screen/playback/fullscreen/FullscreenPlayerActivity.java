@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -105,8 +106,31 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         DefaultItemAnimator animator = new DefaultItemAnimator();
         animator.setSupportsChangeAnimations(false);
         transcriptList.setItemAnimator(animator);
+        transcriptList.getViewTreeObserver().addOnPreDrawListener(this::updateStickyAvatars);
         transcriptList.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
                                                   oldBottom) -> onListLayout(bottom - top));
+    }
+
+    private boolean updateStickyAvatars() {
+        int listTop = transcriptList.getPaddingTop();
+        for (int i = 0; i < transcriptList.getChildCount(); i++) {
+            View row = transcriptList.getChildAt(i);
+            View avatar = row.findViewById(R.id.avatar);
+            if (avatar == null) {
+                continue;
+            }
+            float translation = 0;
+            int avatarTop = row.getTop() + avatar.getTop();
+            if (avatarTop < listTop) {
+                float maxTranslation = row.getHeight() - row.getPaddingBottom()
+                        - avatar.getTop() - avatar.getHeight();
+                translation = Math.max(0, Math.min(listTop - avatarTop, maxTranslation));
+            }
+            if (avatar.getTranslationY() != translation) {
+                avatar.setTranslationY(translation);
+            }
+        }
+        return true;
     }
 
     private void hideSystemBars() {

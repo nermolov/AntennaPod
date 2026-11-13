@@ -300,6 +300,7 @@
     <string name="show_transcript">Show transcript</string>
     <string name="transcript">Transcript</string>
     <string name="transcript_follow_audio_label">Follow audio</string>
+    <string name="transcript_speaker_number">Speaker %1$d</string>
     <string name="no_transcript_label">No transcript</string>
     <string name="visit_website_label">Visit website</string>
     <string name="visit_social_interact_label">Show comments</string>

@@ -71,14 +71,16 @@
         default = emulator;
       };
 
-      apps.${system}.emulator-tv = {
-        type = "app";
-        program = "${emulatorTv}/bin/run-test-emulator";
-      };
 
-      apps.${system}.emulator = {
-        type = "app";
-        program = "${emulator}/bin/run-test-emulator";
+      apps.${system} = {
+        emulator = {
+          type = "app";
+          program = "${emulator}/bin/run-test-emulator";
+        };
+        emulator-tv = {
+          type = "app";
+          program = "${emulatorTv}/bin/run-test-emulator";
+        };
       };
 
       devShells.${system}.default = pkgs.mkShell {

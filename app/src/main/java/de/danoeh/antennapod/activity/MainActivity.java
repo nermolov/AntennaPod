@@ -58,6 +58,7 @@ import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.ui.common.NavigationToolbarActivity;
 import de.danoeh.antennapod.ui.common.ThemeSwitcher;
+import de.danoeh.antennapod.ui.screen.playback.fullscreen.FullscreenPlayerActivity;
 import de.danoeh.antennapod.ui.common.ThemeUtils;
 import de.danoeh.antennapod.ui.discovery.DiscoveryFragment;
 import de.danoeh.antennapod.ui.screen.FavoritesFragment;
@@ -210,6 +211,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         FragmentContainerView bottomSheet = findViewById(R.id.audioplayerFragment);
         sheetBehavior = (LockableBottomSheetBehavior<FragmentContainerView>) BottomSheetBehavior.from(bottomSheet);
         sheetBehavior.setHideable(false);
+        sheetBehavior.setDraggable(false);
         sheetBehavior.addBottomSheetCallback(bottomSheetCallback);
         bottomSheetBackPressedCallback = new BottomSheetBackPressedCallback(false, sheetBehavior, bottomSheet);
 
@@ -745,8 +747,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
             }
             sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
         } else if (intent.getBooleanExtra(MainActivityStarter.EXTRA_OPEN_PLAYER, false)) {
-            sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-            bottomSheetCallback.onSlide(null, 1.0f);
+            startActivity(new Intent(this, FullscreenPlayerActivity.class));
         } else {
             handleDeeplink(intent.getData());
         }

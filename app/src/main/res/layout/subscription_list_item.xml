@@ -9,6 +9,7 @@
     android:paddingHorizontal="16dp"
     android:paddingVertical="8dp"
     android:foreground="?attr/selectableItemBackground"
+    android:focusable="true"
     android:orientation="horizontal">
 
     <androidx.cardview.widget.CardView

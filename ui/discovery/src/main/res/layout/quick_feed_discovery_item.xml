@@ -10,6 +10,7 @@
 
     <de.danoeh.antennapod.ui.common.SquareImageView
         android:id="@+id/discovery_cover"
+        android:focusable="true"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:elevation="4dp"

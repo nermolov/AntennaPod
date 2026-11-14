@@ -12,6 +12,7 @@
 
     <androidx.cardview.widget.CardView
         android:id="@+id/outerContainer"
+        android:focusable="true"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clickable="false"

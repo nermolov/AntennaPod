@@ -24,6 +24,7 @@
 
             <ImageView
                 android:id="@+id/imgvCover"
+                android:focusable="true"
                 android:layout_width="@dimen/thumbnail_length_queue_item"
                 android:layout_height="@dimen/thumbnail_length_queue_item"
                 android:layout_gravity="center_vertical"
@@ -40,6 +41,7 @@
 
                 <TextView
                     android:id="@+id/txtvPodcast"
+                android:focusable="true"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:foreground="?attr/selectableItemBackground"
@@ -102,6 +104,7 @@
 
             <LinearLayout
                 android:id="@+id/butAction1"
+                android:focusable="true"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -131,6 +134,7 @@
 
             <LinearLayout
                 android:id="@+id/butAction2"
+                android:focusable="true"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"

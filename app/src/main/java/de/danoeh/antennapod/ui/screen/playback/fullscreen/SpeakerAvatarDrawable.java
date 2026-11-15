@@ -17,7 +17,7 @@ public class SpeakerAvatarDrawable extends Drawable {
 
     private static final String[] GLYPHS = {"~", "¤", "*", "×", "÷"};
     private static final int[] COLORS = {0xFF6B8440, 0xFF5D89B8, 0xFF5E8F86, 0xFF9B5230, 0xFF9653A7};
-    private static final float[] GLYPH_DX = {0f, 0f, -1f, 0f, 0f};
+    private static final float[] GLYPH_DX = {0f, 0f, 0f, 0f, 0f};
     private static final float[] GLYPH_DY = {0f, 0f, 6.5f, 0f, 0f};
 
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.collection.ArrayMap;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import de.danoeh.antennapod.model.feed.Chapter;
+import de.danoeh.antennapod.model.feed.DiarizedTranscript;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedCounter;
 import de.danoeh.antennapod.model.feed.FeedItem;
@@ -25,6 +27,7 @@ import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.model.feed.SortOrder;
 import de.danoeh.antennapod.model.feed.SubscriptionsFilter;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.parser.transcript.DiarizedTranscriptCodec;
 import de.danoeh.antennapod.storage.database.mapper.ChapterCursor;
 import de.danoeh.antennapod.storage.database.mapper.DownloadResultCursor;
 import de.danoeh.antennapod.storage.database.mapper.FeedCursor;
@@ -508,6 +511,32 @@ public final class DBReader {
                 chapters.add(cursor.getChapter());
             }
             return chapters;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @Nullable
+    public static synchronized GeneratedTranscript getGeneratedTranscript(final long itemId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getGeneratedTranscriptCursor(itemId)) {
+            if (!cursor.moveToFirst()) {
+                return null;
+            }
+            String jobId = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_TRANSCRIPTION_JOB_ID));
+            String status = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_TRANSCRIPTION_STATUS));
+            String error = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_TRANSCRIPTION_ERROR));
+            byte[] data = cursor.getBlob(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_TRANSCRIPTION_DATA));
+            DiarizedTranscript transcript = null;
+            if (data != null) {
+                try {
+                    transcript = DiarizedTranscriptCodec.decode(data);
+                } catch (IOException e) {
+                    Log.e(TAG, Log.getStackTraceString(e));
+                }
+            }
+            return new GeneratedTranscript(jobId, status, error, transcript);
         } finally {
             adapter.close();
         }

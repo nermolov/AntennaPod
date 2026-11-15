@@ -55,7 +55,7 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3110000;
+    public static final int VERSION = 3120000;
 
     /**
      * Maximum number of arguments for IN-operator.
@@ -138,6 +138,12 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_QUEUE = "Queue";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+    public static final String TABLE_NAME_GENERATED_TRANSCRIPTS = "GeneratedTranscripts";
+    public static final String KEY_TRANSCRIPTION_JOB_ID = "job_id";
+    public static final String KEY_TRANSCRIPTION_STATUS = "status";
+    public static final String KEY_TRANSCRIPTION_ERROR = "error";
+    public static final String KEY_TRANSCRIPTION_DATA = "transcript";
+    public static final String KEY_TRANSCRIPTION_UPDATED_AT = "updated_at";
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -251,6 +257,12 @@ public class PodDBAdapter {
             + TABLE_NAME_FAVORITES + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
+    static final String CREATE_TABLE_GENERATED_TRANSCRIPTS = "CREATE TABLE IF NOT EXISTS "
+            + TABLE_NAME_GENERATED_TRANSCRIPTS + " (" + KEY_FEEDITEM + " INTEGER PRIMARY KEY,"
+            + KEY_TRANSCRIPTION_JOB_ID + " TEXT," + KEY_TRANSCRIPTION_STATUS + " TEXT,"
+            + KEY_TRANSCRIPTION_ERROR + " TEXT," + KEY_TRANSCRIPTION_DATA + " BLOB,"
+            + KEY_TRANSCRIPTION_UPDATED_AT + " INTEGER)";
+
     /**
      * All the tables in the database
      */
@@ -261,7 +273,8 @@ public class PodDBAdapter {
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
             TABLE_NAME_SIMPLECHAPTERS,
-            TABLE_NAME_FAVORITES
+            TABLE_NAME_FAVORITES,
+            TABLE_NAME_GENERATED_TRANSCRIPTS
     };
 
     public static final String SELECT_KEY_ITEM_ID = "item_id";
@@ -940,6 +953,7 @@ public class PodDBAdapter {
             db.delete(TABLE_NAME_FEED_MEDIA, KEY_ID + " IN (" + mediaIds + ")", null);
             db.delete(TABLE_NAME_FEED_ITEMS, KEY_ID + " IN (" + itemIds + ")", null);
             db.delete(TABLE_NAME_FAVORITES, KEY_FEEDITEM + " IN (" + itemIds + ")", null);
+            db.delete(TABLE_NAME_GENERATED_TRANSCRIPTS, KEY_FEEDITEM + " IN (" + itemIds + ")", null);
             db.setTransactionSuccessful();
         } catch (SQLException e) {
             Log.e(TAG, Log.getStackTraceString(e));
@@ -1038,6 +1052,39 @@ public class PodDBAdapter {
                         + "=?", new String[]{String.valueOf(item.getId())}, null,
                 null, null
         );
+    }
+
+    public final Cursor getGeneratedTranscriptCursor(final long itemId) {
+        return db.query(TABLE_NAME_GENERATED_TRANSCRIPTS, null, KEY_FEEDITEM + "=?",
+                new String[]{String.valueOf(itemId)}, null, null, null);
+    }
+
+    public void updateGeneratedTranscript(final long itemId, final ContentValues values) {
+        values.put(KEY_TRANSCRIPTION_UPDATED_AT, System.currentTimeMillis());
+        final ContentValues insert = new ContentValues();
+        insert.put(KEY_FEEDITEM, itemId);
+        db.insertWithOnConflict(TABLE_NAME_GENERATED_TRANSCRIPTS, null, insert, SQLiteDatabase.CONFLICT_IGNORE);
+        db.update(TABLE_NAME_GENERATED_TRANSCRIPTS, values, KEY_FEEDITEM + "=?",
+                new String[]{String.valueOf(itemId)});
+    }
+
+    public void clearGeneratedTranscriptJob(final long itemId) {
+        final String[] args = new String[]{String.valueOf(itemId)};
+        db.beginTransactionNonExclusive();
+        try {
+            final ContentValues values = new ContentValues();
+            values.putNull(KEY_TRANSCRIPTION_JOB_ID);
+            values.putNull(KEY_TRANSCRIPTION_ERROR);
+            values.put(KEY_TRANSCRIPTION_STATUS, GeneratedTranscript.STATUS_DONE);
+            values.put(KEY_TRANSCRIPTION_UPDATED_AT, System.currentTimeMillis());
+            db.update(TABLE_NAME_GENERATED_TRANSCRIPTS, values,
+                    KEY_FEEDITEM + "=? AND " + KEY_TRANSCRIPTION_DATA + " IS NOT NULL", args);
+            db.delete(TABLE_NAME_GENERATED_TRANSCRIPTS,
+                    KEY_FEEDITEM + "=? AND " + KEY_TRANSCRIPTION_DATA + " IS NULL", args);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public final Cursor getDownloadLog(final int feedFileType, final long feedFileId, final long limit) {
@@ -1600,6 +1647,7 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
+            db.execSQL(CREATE_TABLE_GENERATED_TRANSCRIPTS);
 
             db.execSQL(CREATE_INDEX_FEEDITEMS_FEED);
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);

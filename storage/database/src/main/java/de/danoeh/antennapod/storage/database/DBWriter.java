@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.storage.database;
 
 import android.app.backup.BackupManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
@@ -14,11 +15,13 @@ import androidx.documentfile.provider.DocumentFile;
 import com.google.common.util.concurrent.Futures;
 import de.danoeh.antennapod.event.DownloadLogEvent;
 
+import de.danoeh.antennapod.model.feed.DiarizedTranscript;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
 import de.danoeh.antennapod.net.download.serviceinterface.AutoDownloadManager;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.net.download.serviceinterface.FeedUpdateManager;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
+import de.danoeh.antennapod.parser.transcript.DiarizedTranscriptCodec;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import org.greenrobot.eventbus.EventBus;
 
@@ -543,6 +546,52 @@ public class DBWriter {
             adapter.addFavoriteItems(items);
             adapter.close();
             EventBus.getDefault().post(new FeedItemEvent(items, false));
+        });
+    }
+
+    public static Future<?> setTranscriptionJob(final long itemId, final String jobId) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            final ContentValues values = new ContentValues();
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_JOB_ID, jobId);
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_STATUS, GeneratedTranscript.STATUS_RUNNING);
+            values.putNull(PodDBAdapter.KEY_TRANSCRIPTION_ERROR);
+            adapter.updateGeneratedTranscript(itemId, values);
+            adapter.close();
+        });
+    }
+
+    public static Future<?> saveGeneratedTranscript(final long itemId, final DiarizedTranscript transcript) {
+        return runOnDbThread(() -> {
+            final byte[] data = DiarizedTranscriptCodec.encode(transcript);
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            final ContentValues values = new ContentValues();
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_DATA, data);
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_STATUS, GeneratedTranscript.STATUS_DONE);
+            values.putNull(PodDBAdapter.KEY_TRANSCRIPTION_JOB_ID);
+            values.putNull(PodDBAdapter.KEY_TRANSCRIPTION_ERROR);
+            adapter.updateGeneratedTranscript(itemId, values);
+            adapter.close();
+        });
+    }
+
+    public static Future<?> clearTranscriptionJob(final long itemId) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            adapter.clearGeneratedTranscriptJob(itemId);
+            adapter.close();
+        });
+    }
+
+    public static Future<?> setTranscriptionError(final long itemId, final String message) {
+        return runOnDbThread(() -> {
+            final PodDBAdapter adapter = PodDBAdapter.getInstance().open();
+            final ContentValues values = new ContentValues();
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_ERROR, message);
+            values.put(PodDBAdapter.KEY_TRANSCRIPTION_STATUS, GeneratedTranscript.STATUS_ERROR);
+            values.putNull(PodDBAdapter.KEY_TRANSCRIPTION_JOB_ID);
+            adapter.updateGeneratedTranscript(itemId, values);
+            adapter.close();
         });
     }
 

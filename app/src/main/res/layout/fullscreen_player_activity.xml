@@ -14,16 +14,25 @@
         android:layout_weight="1"
         android:clipChildren="false">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/transcriptList"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipChildren="false"
-            android:clipToPadding="false"
-            android:focusable="false"
-            android:overScrollMode="never"
-            android:paddingBottom="21dp"
-            android:scrollbars="none" />
+            android:orientation="horizontal"
+            android:weightSum="100">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/transcriptList"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="85"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:focusable="false"
+                android:overScrollMode="never"
+                android:paddingBottom="21dp"
+                android:scrollbars="none" />
+        </LinearLayout>
 
         <include layout="@layout/fullscreen_transcript_status" />
     </FrameLayout>

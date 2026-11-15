@@ -44,6 +44,8 @@ public abstract class UserPreferences {
     private static final String TAG = "UserPreferences";
 
     // User Interface
+    public static final String PREF_TRANSCRIPTION_SERVER_URL = "prefTranscriptionServerUrl";
+    public static final String PREF_TRANSCRIPTION_API_TOKEN = "prefTranscriptionApiToken";
     public static final String PREF_THEME = "prefTheme";
     public static final String PREF_THEME_BLACK = "prefThemeBlack";
     public static final String PREF_TINTED_COLORS = "prefTintedColors";
@@ -156,6 +158,26 @@ public abstract class UserPreferences {
         UserPreferences.prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         createNoMediaFile();
+    }
+
+    public static String getTranscriptionServerUrl() {
+        String value = prefs.getString(PREF_TRANSCRIPTION_SERVER_URL, "").trim();
+        if (value.isEmpty()) {
+            value = BuildConfig.TRANSCRIPTION_SERVER_URL;
+        }
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
+    }
+
+    public static String getTranscriptionApiToken() {
+        String value = prefs.getString(PREF_TRANSCRIPTION_API_TOKEN, "").trim();
+        return value.isEmpty() ? BuildConfig.TRANSCRIPTION_API_TOKEN : value;
+    }
+
+    public static boolean isTranscriptionConfigured() {
+        return !getTranscriptionServerUrl().isEmpty() && !getTranscriptionApiToken().isEmpty();
     }
 
     public enum ThemePreference {

@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputType;
 import androidx.annotation.NonNull;
 import androidx.collection.ArrayMap;
+import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import de.danoeh.antennapod.R;
@@ -27,6 +29,28 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
 
         setupPlaybackScreen();
         buildSmartMarkAsPlayedPreference();
+        buildTranscriptionPreferences();
+    }
+
+    private void buildTranscriptionPreferences() {
+        EditTextPreference serverUrl = requirePreference(UserPreferences.PREF_TRANSCRIPTION_SERVER_URL);
+        serverUrl.setSummaryProvider(preference -> {
+            String value = UserPreferences.getTranscriptionServerUrl();
+            return value.isEmpty() ? getString(R.string.transcription_not_set) : value;
+        });
+        serverUrl.setOnBindEditTextListener(editText -> {
+            editText.setText(UserPreferences.getTranscriptionServerUrl());
+            editText.setSelection(editText.getText().length());
+        });
+
+        EditTextPreference token = requirePreference(UserPreferences.PREF_TRANSCRIPTION_API_TOKEN);
+        token.setSummaryProvider(preference -> UserPreferences.getTranscriptionApiToken().isEmpty()
+                ? getString(R.string.transcription_not_set) : getString(R.string.transcription_token_set));
+        token.setOnBindEditTextListener(editText -> {
+            editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            editText.setText(UserPreferences.getTranscriptionApiToken());
+            editText.setSelection(editText.getText().length());
+        });
     }
 
     @Override

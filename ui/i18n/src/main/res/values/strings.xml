@@ -486,6 +486,11 @@
     <string name="pref_auto_delete_title">Automatic deletion</string>
     <string name="pref_auto_delete_sum">Delete episodes after playing or when automatic download needs space</string>
     <string name="pref_auto_local_delete_title">Auto delete from local folders</string>
+    <string name="transcription_pref_category">Transcription</string>
+    <string name="transcription_server_url_title">Transcription server URL</string>
+    <string name="transcription_api_token_title">Transcription API token</string>
+    <string name="transcription_not_set">Not set</string>
+    <string name="transcription_token_set">Token is set</string>
     <string name="pref_auto_local_delete_sum">Also delete files added through \"add local folder\". Note that these are not downloaded by AntennaPod and cannot be re-downloaded</string>
     <string name="pref_auto_local_delete_dialog_body">Note that for local folders this will remove episodes from AntennaPod and delete their media files from your device storage. They cannot be downloaded again through AntennaPod. Enable auto delete?</string>
     <string name="pref_smart_mark_as_played_sum">Mark episodes as played even if less than a certain amount of seconds of playing time is still left</string>

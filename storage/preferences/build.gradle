@@ -6,6 +6,17 @@ apply from: "../../common.gradle"
 android {
     namespace "de.danoeh.antennapod.storage.preferences"
 
+    defaultConfig {
+        def localProperties = new Properties()
+        def localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.withInputStream { localProperties.load(it) }
+        }
+        def quote = { String value -> '"' + value.trim().replace("\\", "\\\\").replace('"', '\\"') + '"' }
+        buildConfigField "String", "TRANSCRIPTION_SERVER_URL", quote(localProperties.getProperty("transcription.serverUrl", ""))
+        buildConfigField "String", "TRANSCRIPTION_API_TOKEN", quote(localProperties.getProperty("transcription.apiToken", ""))
+    }
+
     lint {
         disable "StaticFieldLeak"
     }

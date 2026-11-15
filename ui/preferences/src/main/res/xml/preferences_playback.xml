@@ -92,4 +92,15 @@
                 android:summary="@string/pref_skip_keeps_episodes_sum"
                 android:title="@string/pref_skip_keeps_episodes_title"/>
     </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/transcription_pref_category">
+        <EditTextPreference
+                android:key="prefTranscriptionServerUrl"
+                android:dialogTitle="@string/transcription_server_url_title"
+                android:title="@string/transcription_server_url_title"/>
+        <EditTextPreference
+                android:key="prefTranscriptionApiToken"
+                android:dialogTitle="@string/transcription_api_token_title"
+                android:title="@string/transcription_api_token_title"/>
+    </PreferenceCategory>
 </PreferenceScreen>

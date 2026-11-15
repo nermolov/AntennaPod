@@ -2,6 +2,7 @@ package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -50,6 +51,11 @@ public class RevealTextView extends View {
             return;
         }
         paint.setTextSize(px);
+        invalidateLayout();
+    }
+
+    public void setTypeface(Typeface typeface) {
+        paint.setTypeface(typeface);
         invalidateLayout();
     }
 
@@ -109,13 +115,29 @@ public class RevealTextView extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int width = MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight();
+        int padding = getPaddingLeft() + getPaddingRight();
+        int width = MeasureSpec.getSize(widthMeasureSpec) - padding;
         if (layout == null || width != layoutWidth) {
             buildLayout(width);
         }
-        int height = revealedLines == 0 || layout == null ? 0 : layout.getLineBottom(revealedLines - 1);
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec),
-                resolveSize(height + getPaddingTop() + getPaddingBottom(), heightMeasureSpec));
+        int measuredWidth = MeasureSpec.getSize(widthMeasureSpec);
+        if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY && layout != null) {
+            measuredWidth = Math.min(measuredWidth, widestLine() + padding);
+        }
+        int height = 0;
+        if (revealedLines > 0 && layout != null) {
+            height = Math.max(layout.getLineBottom(revealedLines - 1) + getPaddingTop() + getPaddingBottom(),
+                    getMinimumHeight());
+        }
+        setMeasuredDimension(measuredWidth, resolveSize(height, heightMeasureSpec));
+    }
+
+    private int widestLine() {
+        float widest = 0;
+        for (int i = 0; i < layout.getLineCount(); i++) {
+            widest = Math.max(widest, layout.getLineWidth(i));
+        }
+        return (int) Math.ceil(widest);
     }
 
     @Override
@@ -123,8 +145,10 @@ public class RevealTextView extends View {
         if (layout == null || revealedLines == 0) {
             return;
         }
+        int textHeight = layout.getLineBottom(revealedLines - 1);
+        int free = getHeight() - getPaddingTop() - getPaddingBottom() - textHeight;
         canvas.save();
-        canvas.translate(getPaddingLeft(), getPaddingTop());
+        canvas.translate(getPaddingLeft(), getPaddingTop() + Math.max(0, free / 2f));
         canvas.clipRect(0, 0, layoutWidth, layout.getLineBottom(revealedLines - 1));
         layout.draw(canvas);
         canvas.restore();

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fullscreen_player_text_primary">#FFFFFF</color>
+    <color name="fullscreen_player_bubble_text">#2B2B2B</color>
+    <color name="fullscreen_player_progress_elapsed">#141414</color>
+    <color name="fullscreen_player_progress_remaining">#A6858585</color>
+
+    <dimen name="fullscreen_transcript_text_size">36sp</dimen>
+
+    <style name="FullscreenPlayerText">
+        <item name="android:fontFamily">@font/haffer_collection_family</item>
+        <item name="android:textColor">@color/fullscreen_player_text_primary</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <style name="FullscreenPlayerText.Title">
+        <item name="android:textSize">36sp</item>
+    </style>
+
+    <style name="FullscreenPlayerText.Subtitle">
+        <item name="android:textSize">26sp</item>
+    </style>
+
+    <style name="FullscreenPlayerTime">
+        <item name="android:fontFamily">@font/inter_variable</item>
+        <item name="android:textColor">@color/fullscreen_player_text_primary</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+</resources>

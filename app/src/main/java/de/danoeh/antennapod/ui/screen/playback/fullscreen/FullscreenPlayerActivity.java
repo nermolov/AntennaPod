@@ -1,6 +1,8 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
-import android.graphics.drawable.ColorDrawable;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
@@ -23,7 +25,12 @@ import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.palette.graphics.Palette;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.bumptech.glide.request.RequestOptions;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.EpisodeDownloadEvent;
@@ -77,8 +84,6 @@ import java.util.concurrent.TimeUnit;
 public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final String TAG = "FullscreenPlayer";
     private static final long SEEK_THROTTLE_MS = 300;
-    private static final float VISIBLE_LINES = 5.6f;
-    private static final float LINE_HEIGHT_RATIO = 1.17f;
     private static final long POLL_INTERVAL_SECONDS = 3;
     private static final int PROGRESS_MAX = 1000;
     private static final int COLOR_TITLE = 0xFFFFFFFF;
@@ -181,7 +186,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().setBackgroundDrawable(new ColorDrawable(0xFF0A0A0A));
+        applyBackground(PlayerColorScheme.DEFAULT_BACKGROUND);
         setContentView(R.layout.fullscreen_player_activity);
         hideSystemBars();
 
@@ -254,8 +259,6 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             return;
         }
         lastListHeight = height;
-        float lineHeight = height / VISIBLE_LINES;
-        adapter.setTextSizePx(lineHeight / LINE_HEIGHT_RATIO);
         jumpPending = true;
         lastTime = -1;
     }
@@ -339,7 +342,37 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                         .load(ImageResourceUtils.getFallbackImageLocation(media))
                         .apply(options))
                 .apply(options)
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target,
+                                                boolean isFirstResource) {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target,
+                                                   DataSource dataSource, boolean isFirstResource) {
+                        if (resource instanceof BitmapDrawable) {
+                            extractBackground(((BitmapDrawable) resource).getBitmap());
+                        }
+                        return false;
+                    }
+                })
                 .into(coverImage);
+    }
+
+    private void extractBackground(Bitmap bitmap) {
+        Palette.from(bitmap).generate(palette -> {
+            if (palette != null) {
+                int primary = palette.getDominantColor(PlayerColorScheme.DEFAULT_BACKGROUND);
+                applyBackground(PlayerColorScheme.background(primary));
+            }
+        });
+    }
+
+    private void applyBackground(int background) {
+        getWindow().setBackgroundDrawable(
+                new NoiseBackgroundDrawable(background, PlayerColorScheme.noise(background)));
     }
 
     private boolean isPlaybackActive() {

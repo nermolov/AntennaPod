@@ -1,27 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/playerRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0A0A0A"
+    android:clipChildren="false"
     android:orientation="vertical"
-    android:paddingHorizontal="48dp"
-    android:paddingVertical="27dp">
+    android:paddingHorizontal="36dp"
+    android:paddingBottom="36dp">
 
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="7">
+        android:layout_weight="1"
+        android:clipChildren="false">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/transcriptList"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
             android:clipToPadding="false"
             android:focusable="false"
             android:overScrollMode="never"
-            android:requiresFadingEdge="vertical"
-            android:fadingEdgeLength="48dp"
+            android:paddingBottom="21dp"
             android:scrollbars="none" />
 
         <include layout="@layout/fullscreen_transcript_status" />
@@ -29,77 +30,76 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="3"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingTop="8dp">
+        android:paddingEnd="14dp">
 
-        <de.danoeh.antennapod.ui.common.SquareImageView
+        <ImageView
             android:id="@+id/coverImage"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
+            android:layout_width="195dp"
+            android:layout_height="196dp"
+            android:background="@drawable/bg_fullscreen_cover"
+            android:clipToOutline="true"
             android:importantForAccessibility="no"
-            android:scaleType="centerCrop"
-            app:direction="height" />
+            android:scaleType="centerCrop" />
 
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_marginStart="32dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="26dp"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingTop="5dp">
 
             <TextView
                 android:id="@+id/episodeTitle"
+                style="@style/FullscreenPlayerText.Title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="#FFFFFF"
-                android:textSize="28sp"
-                android:textStyle="bold" />
+                android:maxLines="2" />
 
             <TextView
                 android:id="@+id/feedTitle"
+                style="@style/FullscreenPlayerText.Subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="10dp"
                 android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#B3FFFFFF"
-                android:textSize="20sp" />
+                android:maxLines="1" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="20dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingVertical="10dp">
 
                 <TextView
                     android:id="@+id/elapsedText"
+                    style="@style/FullscreenPlayerTime"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="18sp" />
+                    android:layout_height="wrap_content" />
 
                 <ProgressBar
                     android:id="@+id/progress"
                     style="?android:attr/progressBarStyleHorizontal"
                     android:layout_width="0dp"
-                    android:layout_height="6dp"
-                    android:layout_marginHorizontal="16dp"
+                    android:layout_height="12dp"
+                    android:layout_marginHorizontal="10dp"
                     android:layout_weight="1"
+                    android:alpha="0.58"
                     android:focusable="false"
-                    android:max="1000" />
+                    android:max="1000"
+                    android:progressDrawable="@drawable/fullscreen_progress" />
 
                 <TextView
                     android:id="@+id/durationText"
+                    style="@style/FullscreenPlayerTime"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="#B3FFFFFF"
-                    android:textSize="18sp" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

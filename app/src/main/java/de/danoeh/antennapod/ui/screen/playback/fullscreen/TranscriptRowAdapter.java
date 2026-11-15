@@ -1,11 +1,13 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
-import android.graphics.Paint;
+import android.content.Context;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import androidx.annotation.NonNull;
+import androidx.core.content.res.ResourcesCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import de.danoeh.antennapod.R;
 
@@ -13,12 +15,14 @@ import java.util.List;
 
 public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdapter.ViewHolder> {
     private static final Object PAYLOAD = new Object();
-    private static final int CURRENT_COLOR = 0xFFFFFFFF;
-    private static final int PAST_COLOR = 0x8CFFFFFF;
+    private static final float BUBBLE_CORNER_DP = 21f;
+    private static final float BUBBLE_SHADOW_DY_DP = 4f;
+    private static final float BUBBLE_SHADOW_BLUR_DP = 6f;
+    private static final int BUBBLE_SHADOW_COLOR = 0x401D1818;
 
     private LiveTranscriptModel model;
-    private float textSizePx = 48f;
-    private int avatarSizePx = 70;
+    private Typeface avatarTypeface;
+    private Typeface textTypeface;
     private int visibleCount = 0;
     private long currentTime = 0;
     private int trackedIndex = -1;
@@ -34,15 +38,6 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         trackedIndex = -1;
         trackedWords = -1;
         currentTime = 0;
-        notifyDataSetChanged();
-    }
-
-    public void setTextSizePx(float px) {
-        textSizePx = px;
-        Paint paint = new Paint();
-        paint.setTextSize(px);
-        Paint.FontMetrics metrics = paint.getFontMetrics();
-        avatarSizePx = Math.round((metrics.descent - metrics.ascent) * 1.2f);
         notifyDataSetChanged();
     }
 
@@ -86,24 +81,31 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.fullscreen_transcript_row, parent, false);
+        Context context = parent.getContext();
+        if (avatarTypeface == null) {
+            avatarTypeface = ResourcesCompat.getFont(context, R.font.margarine_regular);
+            textTypeface = ResourcesCompat.getFont(context, R.font.haffer_collection_family);
+        }
+        View view = LayoutInflater.from(context).inflate(R.layout.fullscreen_transcript_row, parent, false);
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         LiveTranscriptModel.Turn turn = model.getTurn(position);
-        ViewGroup.LayoutParams params = holder.avatar.getLayoutParams();
-        if (params.width != avatarSizePx || params.height != avatarSizePx) {
-            params.width = avatarSizePx;
-            params.height = avatarSizePx;
-            holder.avatar.setLayoutParams(params);
-        }
-        holder.avatar.setImageDrawable(new SpeakerAvatarDrawable(turn.getSpeakerIndex()));
-        holder.avatar.setContentDescription(holder.itemView.getContext()
-                .getString(R.string.transcript_speaker_number, turn.getSpeakerIndex() + 1));
-        holder.text.setTextSizePx(textSizePx);
+        Context context = holder.itemView.getContext();
+        float density = context.getResources().getDisplayMetrics().density;
+        int speaker = turn.getSpeakerIndex();
+        holder.avatar.setImageDrawable(new SpeakerAvatarDrawable(speaker, avatarTypeface, density));
+        holder.avatar.setContentDescription(context.getString(R.string.transcript_speaker_number, speaker + 1));
+        holder.text.setBackground(new ShadowedRoundRectDrawable(
+                PlayerColorScheme.bubble(SpeakerAvatarDrawable.colorFor(speaker)),
+                BUBBLE_CORNER_DP * density, density, BUBBLE_SHADOW_DY_DP * density,
+                BUBBLE_SHADOW_BLUR_DP * density, BUBBLE_SHADOW_COLOR));
+        holder.text.setTypeface(textTypeface);
+        holder.text.setTextColor(ResourcesCompat.getColor(context.getResources(),
+                R.color.fullscreen_player_bubble_text, context.getTheme()));
+        holder.text.setTextSizePx(context.getResources().getDimension(R.dimen.fullscreen_transcript_text_size));
         holder.text.setTurn(turn);
         applyReveal(holder, position);
     }
@@ -119,9 +121,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
 
     private void applyReveal(ViewHolder holder, int position) {
         boolean current = position == visibleCount - 1;
-        holder.text.setTextColor(current ? CURRENT_COLOR : PAST_COLOR);
         holder.text.setRevealTime(current ? currentTime : Long.MAX_VALUE);
-        holder.avatar.setAlpha(current ? 1f : 0.55f);
     }
 
     @Override

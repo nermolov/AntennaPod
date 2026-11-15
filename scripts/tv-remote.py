@@ -72,6 +72,48 @@ def find_adb_command():
     return None
 
 
+def list_devices(adb_command):
+    result = subprocess.run(
+        adb_command + ["devices", "-l"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+    )
+    devices = []
+    for line in result.stdout.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) < 2 or parts[1] != "device":
+            continue
+        details = dict(part.split(":", 1) for part in parts[2:] if ":" in part)
+        label = details.get("model") or details.get("device") or ""
+        devices.append((parts[0], label.replace("_", " ")))
+    return devices
+
+
+def select_device(win, devices):
+    index = 0
+    win.timeout(-1)
+    while True:
+        win.erase()
+        safe_addstr(win, 0, 0, "Select a device", curses.A_BOLD)
+        for row, (serial, label) in enumerate(devices):
+            attr = curses.A_REVERSE if row == index else 0
+            safe_addstr(win, 2 + row, 2, ("%s  %s" % (serial, label)).strip().ljust(40), attr)
+        safe_addstr(win, 3 + len(devices), 0, "↑/↓: move   Enter: select   q: quit", curses.color_pair(2))
+        win.refresh()
+        ch = win.getch()
+        if ch in (ord("q"), 3):
+            return None
+        if ch in (curses.KEY_UP, ord("k")):
+            index = (index - 1) % len(devices)
+        elif ch in (curses.KEY_DOWN, ord("j")):
+            index = (index + 1) % len(devices)
+        elif ch in (10, 13, curses.KEY_ENTER):
+            return devices[index][0]
+        elif ord("1") <= ch <= ord("9") and ch - ord("1") < len(devices):
+            return devices[ch - ord("1")][0]
+
+
 class AdbShell:
     def __init__(self, adb_command):
         self.adb_command = adb_command
@@ -157,12 +199,20 @@ def draw(win, shell, flashes, history, now):
     win.refresh()
 
 
-def run(stdscr, adb_command):
+def run(stdscr, adb_command, devices):
     curses.curs_set(0)
     init_colors()
     stdscr.keypad(True)
-    stdscr.timeout(50)
     os.environ.setdefault("ESCDELAY", "25")
+
+    if len(devices) > 1:
+        serial = select_device(stdscr, devices)
+        if serial is None:
+            return
+    else:
+        serial = devices[0][0]
+    adb_command = adb_command + ["-s", serial]
+    stdscr.timeout(50)
 
     shell = AdbShell(adb_command)
     flashes = {}
@@ -191,8 +241,11 @@ def main():
     adb_command = find_adb_command()
     if adb_command is None:
         sys.exit("adb not found and nix is unavailable")
+    devices = list_devices(adb_command)
+    if not devices:
+        sys.exit("no connected adb devices found")
     os.environ.setdefault("ESCDELAY", "25")
-    curses.wrapper(run, adb_command)
+    curses.wrapper(run, adb_command, devices)
 
 
 if __name__ == "__main__":

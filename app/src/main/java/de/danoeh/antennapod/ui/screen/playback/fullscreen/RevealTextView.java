@@ -12,6 +12,7 @@ import android.view.View;
 import java.util.Arrays;
 
 public class RevealTextView extends View {
+    private static final float LINE_SPACING_MULTIPLIER = 1.2f;
     private final TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
     private LiveTranscriptModel.Turn turn;
     private long revealTime = Long.MAX_VALUE;
@@ -95,6 +96,7 @@ public class RevealTextView extends View {
         String text = turn.getText();
         layout = StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, LINE_SPACING_MULTIPLIER)
                 .build();
         int lines = layout.getLineCount();
         lineStartTimes = new long[lines];

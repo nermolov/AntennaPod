@@ -63,6 +63,6 @@ public class PlayerColorSchemeTest {
 
     @Test
     public void backgroundLeavesAlreadyDarkColorUntouched() {
-        assertEquals(0xFF2F3473, PlayerColorScheme.background(0xFF2F3473));
+        assertEquals(0xFF1F2250, PlayerColorScheme.background(0xFF1F2250));
     }
 }

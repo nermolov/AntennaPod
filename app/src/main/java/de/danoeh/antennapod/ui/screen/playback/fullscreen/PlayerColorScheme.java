@@ -6,7 +6,7 @@ import androidx.palette.graphics.Palette;
 
 public final class PlayerColorScheme {
     public static final int DEFAULT_BACKGROUND = 0xFF2F3473;
-    static final double MIN_CONTRAST_WITH_WHITE = 10.0;
+    static final double MIN_CONTRAST_WITH_WHITE = 13.0;
     static final float MIN_PRIMARY_SATURATION = 0.3f;
     static final float MIN_PRIMARY_VALUE = 0.4f;
     static final float NOISE_SATURATION_RATIO = 0.68f;

@@ -26,6 +26,7 @@ Only then run the application or the tests to verify it.
 Usually you will need to run the application, but if there are existing tests that cover the code you wrote, you can run those instead.
 For installing and running the application, use the command
 `./gradlew --console=plain :app:installPlayDebug && adb shell monkey -p de.danoeh.antennapod.debug 1`.
+To test the fullscreen player with data, run `python3 scripts/seed-fake-episode.py` (set `ANDROID_SERIAL` if several devices are connected). It seeds a fake feed with an episode, a diarized transcript and a cover into the debug app, and opens the fullscreen player.
 If needed, you can grab a textual representation of the screen using `adb shell uiautomator dump /sdcard/ui.xml; adb shell cat /sdcard/ui.xml`.
 You can even control connected devices using `adb shell input tap <x> <y>` and `adb shell input swipe <x1> <y1> <x2> <y2> <duration ms>`.
 If there is a crash, read the logs using `adb logcat -d | grep "de.danoeh.antennapod" | tail -20` and fix the issue.

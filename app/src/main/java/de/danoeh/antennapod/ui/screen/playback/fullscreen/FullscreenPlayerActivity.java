@@ -535,6 +535,16 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             protected int getVerticalSnapPreference() {
                 return SNAP_TO_END;
             }
+
+            @Override
+            protected void onTargetFound(View targetView, RecyclerView.State state, Action action) {
+                int dy = calculateDyToMakeVisible(targetView, getVerticalSnapPreference());
+                if (dy == 0) {
+                    super.onTargetFound(targetView, state, action);
+                    return;
+                }
+                action.update(0, -dy, (int) RevealTextView.SLIDE_DURATION_MS, mDecelerateInterpolator);
+            }
         };
         scroller.setTargetPosition(position);
         layoutManager.startSmoothScroll(scroller);

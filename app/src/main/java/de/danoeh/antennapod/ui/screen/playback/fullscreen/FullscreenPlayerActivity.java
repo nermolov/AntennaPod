@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
 import android.graphics.Bitmap;
+import android.graphics.Outline;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -9,6 +10,7 @@ import android.util.Log;
 import android.view.Choreographer;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -192,6 +194,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
 
         transcriptList = findViewById(R.id.transcriptList);
         coverImage = findViewById(R.id.coverImage);
+        final float coverRadius = getResources().getDimension(R.dimen.fullscreen_cover_corner_radius);
+        coverImage.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), coverRadius);
+            }
+        });
+        coverImage.setClipToOutline(true);
         episodeTitle = findViewById(R.id.episodeTitle);
         feedTitle = findViewById(R.id.feedTitle);
         progress = findViewById(R.id.progress);
@@ -364,7 +374,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private void extractBackground(Bitmap bitmap) {
         Palette.from(bitmap).generate(palette -> {
             if (palette != null) {
-                int primary = palette.getDominantColor(PlayerColorScheme.DEFAULT_BACKGROUND);
+                int primary = PlayerColorScheme.primary(palette);
                 applyBackground(PlayerColorScheme.background(primary));
             }
         });
@@ -372,7 +382,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
 
     private void applyBackground(int background) {
         getWindow().setBackgroundDrawable(
-                new NoiseBackgroundDrawable(background, PlayerColorScheme.noise(background)));
+                new NoiseBackgroundDrawable(background, PlayerColorScheme.noise(background),
+                        getResources().getDisplayMetrics().density));
     }
 
     private boolean isPlaybackActive() {
@@ -496,15 +507,22 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         long second = shownPosition / 1000;
         if (second != lastDisplayedSecond) {
             lastDisplayedSecond = second;
-            elapsedText.setText(Converter.getDurationStringLong(shownPosition));
+            elapsedText.setText(formatClock(shownPosition));
             if (duration > 0) {
                 progress.setProgress((int) (time * progress.getMax() / duration));
             }
         }
         if (duration != lastDisplayedDuration) {
             lastDisplayedDuration = duration;
-            durationText.setText(Converter.getDurationStringLong(converter.convert((int) duration)));
+            durationText.setText(formatClock(converter.convert((int) duration)));
         }
+    }
+
+    private static String formatClock(int millis) {
+        if (millis < 3600 * 1000) {
+            return Converter.getDurationStringShort(Math.max(millis, 0), false);
+        }
+        return Converter.getDurationStringLong(millis);
     }
 
     private boolean buttonsVisible() {

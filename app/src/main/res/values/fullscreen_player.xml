@@ -6,9 +6,11 @@
     <color name="fullscreen_player_progress_remaining">#A6858585</color>
 
     <dimen name="fullscreen_transcript_text_size">36sp</dimen>
+    <dimen name="fullscreen_cover_corner_radius">14dp</dimen>
 
     <style name="FullscreenPlayerText">
-        <item name="android:fontFamily">@font/haffer_collection_family</item>
+        <item name="android:fontFamily">@font/haffer_regular</item>
+        <item name="fontFamily">@font/haffer_regular</item>
         <item name="android:textColor">@color/fullscreen_player_text_primary</item>
         <item name="android:includeFontPadding">false</item>
     </style>
@@ -22,7 +24,8 @@
     </style>
 
     <style name="FullscreenPlayerTime">
-        <item name="android:fontFamily">@font/inter_variable</item>
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="fontFamily">@font/inter_regular</item>
         <item name="android:textColor">@color/fullscreen_player_text_primary</item>
         <item name="android:textSize">20sp</item>
         <item name="android:includeFontPadding">false</item>

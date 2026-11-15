@@ -84,7 +84,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         Context context = parent.getContext();
         if (avatarTypeface == null) {
             avatarTypeface = ResourcesCompat.getFont(context, R.font.margarine_regular);
-            textTypeface = ResourcesCompat.getFont(context, R.font.haffer_collection_family);
+            textTypeface = ResourcesCompat.getFont(context, R.font.haffer_regular);
         }
         View view = LayoutInflater.from(context).inflate(R.layout.fullscreen_transcript_row, parent, false);
         return new ViewHolder(view);

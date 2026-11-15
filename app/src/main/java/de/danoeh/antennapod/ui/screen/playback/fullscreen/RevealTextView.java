@@ -48,10 +48,6 @@ public class RevealTextView extends View {
         return slideProgress < 1f && shownLines < revealedLines;
     }
 
-    public int getTargetHeight() {
-        return paddedHeight(revealedLines);
-    }
-
     public static int revealedLineCount(long[] lineStartTimes, long timeMs) {
         int count = 0;
         while (count < lineStartTimes.length && lineStartTimes[count] <= timeMs) {

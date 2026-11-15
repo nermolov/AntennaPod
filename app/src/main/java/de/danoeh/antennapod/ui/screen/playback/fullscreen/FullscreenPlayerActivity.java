@@ -237,7 +237,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         transcriptList.setAdapter(adapter);
         DefaultItemAnimator animator = new DefaultItemAnimator();
         animator.setSupportsChangeAnimations(false);
-        animator.setAddDuration(RevealTextView.SLIDE_DURATION_MS);
+        animator.setAddDuration(0);
         animator.setMoveDuration(RevealTextView.SLIDE_DURATION_MS);
         animator.setRemoveDuration(RevealTextView.SLIDE_DURATION_MS);
         transcriptList.setItemAnimator(animator);

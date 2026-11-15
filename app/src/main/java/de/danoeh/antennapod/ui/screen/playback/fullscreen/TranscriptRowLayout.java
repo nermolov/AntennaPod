@@ -27,10 +27,6 @@ public class TranscriptRowLayout extends LinearLayout {
         if (text.isSliding()) {
             int height = getPaddingTop() + getPaddingBottom() + text.getMeasuredHeight();
             setMeasuredDimension(getMeasuredWidth(), Math.min(getMeasuredHeight(), height));
-            int target = text.getTargetHeight();
-            avatar.setAlpha(target > 0 ? Math.min(1f, text.getMeasuredHeight() / (float) target) : 1f);
-        } else if (avatar.getAlpha() != 1f) {
-            avatar.setAlpha(1f);
         }
     }
 }

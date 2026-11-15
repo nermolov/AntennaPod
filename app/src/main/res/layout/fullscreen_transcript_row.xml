@@ -24,6 +24,7 @@
         android:focusable="false"
         android:minHeight="75dp"
         android:paddingHorizontal="25dp"
-        android:paddingVertical="20dp" />
+        android:paddingBottom="20dp"
+        android:paddingTop="15dp" />
 
 </de.danoeh.antennapod.ui.screen.playback.fullscreen.TranscriptRowLayout>

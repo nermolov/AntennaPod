@@ -93,6 +93,8 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         LiveTranscriptModel.Turn turn = model.getTurn(position);
+        holder.itemView.animate().cancel();
+        holder.itemView.setAlpha(1f);
         Context context = holder.itemView.getContext();
         float density = context.getResources().getDisplayMetrics().density;
         int speaker = turn.getSpeakerIndex();

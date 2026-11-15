@@ -13,6 +13,7 @@ import android.util.Log;
 import android.view.Choreographer;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -29,7 +30,6 @@ import androidx.media3.session.MediaController;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.palette.graphics.Palette;
 import com.bumptech.glide.Glide;
@@ -82,7 +82,9 @@ import org.json.JSONException;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -182,6 +184,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private String hashedValue;
     private float speed = 1.0f;
     private boolean alignPending = false;
+    private boolean smoothScrollPending = false;
+    private final List<View> fadeInRows = new ArrayList<>();
     private boolean jumpPending = true;
     private boolean modelReady = false;
     private boolean started = false;
@@ -240,6 +244,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         transcriptList.setAdapter(adapter);
         DefaultItemAnimator animator = new DefaultItemAnimator() {
             @Override
+            public boolean animateAdd(RecyclerView.ViewHolder holder) {
+                holder.itemView.setAlpha(0f);
+                fadeInRows.add(holder.itemView);
+                dispatchAddFinished(holder);
+                return false;
+            }
+
+            @Override
             public boolean animatePersistence(@NonNull RecyclerView.ViewHolder viewHolder,
                                               @NonNull RecyclerView.ItemAnimator.ItemHolderInfo preInfo,
                                               @NonNull RecyclerView.ItemAnimator.ItemHolderInfo postInfo) {
@@ -259,6 +271,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         };
         animator.setSupportsChangeAnimations(false);
         transcriptList.setItemAnimator(animator);
+        transcriptList.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    fadeInPendingRow();
+                }
+            }
+        });
         transcriptList.getViewTreeObserver().addOnPreDrawListener(this::updateStickyAvatars);
         transcriptList.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
                                                   oldBottom) -> onListLayout(bottom - top));
@@ -289,6 +309,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         return true;
     }
 
+    private void fadeInPendingRow() {
+        long duration = transcriptList.getItemAnimator().getAddDuration();
+        for (View row : fadeInRows) {
+            row.animate().alpha(1f).setDuration(duration).start();
+        }
+        fadeInRows.clear();
+    }
+
     private void pinToEnd() {
         if (!modelReady || jumpPending || transcriptList.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
             return;
@@ -299,6 +327,16 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             return;
         }
         int remaining = lastRow.getBottom() - (transcriptList.getHeight() - transcriptList.getPaddingBottom());
+        if (smoothScrollPending) {
+            smoothScrollPending = false;
+            if (remaining > 0) {
+                transcriptList.smoothScrollBy(0, remaining, new DecelerateInterpolator(),
+                        (int) RevealTextView.SLIDE_DURATION_MS);
+            } else {
+                fadeInPendingRow();
+            }
+            return;
+        }
         if (remaining != 0) {
             transcriptList.scrollBy(0, remaining);
         }
@@ -525,29 +563,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             layoutManager.scrollToPositionWithOffset(count - 1, 0);
         } else if (count != previousCount) {
             alignPending = true;
-            smoothScrollToEnd(count - 1);
+            smoothScrollPending = true;
         }
-    }
-
-    private void smoothScrollToEnd(int position) {
-        LinearSmoothScroller scroller = new LinearSmoothScroller(this) {
-            @Override
-            protected int getVerticalSnapPreference() {
-                return SNAP_TO_END;
-            }
-
-            @Override
-            protected void onTargetFound(View targetView, RecyclerView.State state, Action action) {
-                int dy = calculateDyToMakeVisible(targetView, getVerticalSnapPreference());
-                if (dy == 0) {
-                    super.onTargetFound(targetView, state, action);
-                    return;
-                }
-                action.update(0, -dy, (int) RevealTextView.SLIDE_DURATION_MS, mDecelerateInterpolator);
-            }
-        };
-        scroller.setTargetPosition(position);
-        layoutManager.startSmoothScroll(scroller);
     }
 
     private void alignToEnd() {

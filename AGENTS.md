@@ -16,9 +16,6 @@ After you are sure that the code is correct, ensure that there are no compilatio
 To compile the code, use `./gradlew :app:assembleDebug`.
 You are already in the main directory of the project so there is no need to `cd` into the main folder.
 The CD command is strictly forbidden. Always assume that you are already at the main folder of the project.
-Never alter or filter the compile output in any way (no grep, head, tail, or any other command that truncates output).
-You will lose critical information and the results will not be helpful.
-Always look at the complete compiler output.
 DO NOT MAKE UP YOUR OWN COMPILE COMMANDS, THEY WILL NOT WORK!
 ONLY USE THE EXACT COMMANDS GIVEN IN THIS FILE!
 

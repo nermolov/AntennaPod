@@ -3,7 +3,7 @@
     <color name="fullscreen_player_text_primary">#FFFFFF</color>
     <color name="fullscreen_player_bubble_text">#2B2B2B</color>
     <color name="fullscreen_player_progress_elapsed">#141414</color>
-    <color name="fullscreen_player_progress_remaining">#A6858585</color>
+    <color name="fullscreen_player_progress_remaining">#A6787878</color>
 
     <dimen name="fullscreen_transcript_text_size">36sp</dimen>
     <dimen name="fullscreen_transcript_edge_gap">20dp</dimen>

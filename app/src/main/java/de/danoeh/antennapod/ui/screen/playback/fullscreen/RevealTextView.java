@@ -8,7 +8,9 @@ import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.util.SparseArray;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.animation.DecelerateInterpolator;
 
 import java.util.Arrays;
@@ -21,12 +23,12 @@ public class RevealTextView extends View {
     private long revealTime = Long.MAX_VALUE;
     private StaticLayout layout;
     private long[] lineStartTimes = new long[0];
+    private final SparseArray<Built> builtLayouts = new SparseArray<>();
     private int layoutWidth = -1;
     private int revealedLines = 0;
     private int shownLines = 0;
     private float slideProgress = 1f;
     private boolean turnFresh = true;
-    private boolean animateIn = false;
     private ValueAnimator slideAnimator;
 
     public RevealTextView(Context context) {
@@ -40,12 +42,11 @@ public class RevealTextView extends View {
         setPadding(getPaddingLeft(), Math.max(0, getPaddingTop() - 1), getPaddingRight(), getPaddingBottom());
     }
 
-    public void setAnimateIn(boolean animateIn) {
-        this.animateIn = animateIn;
-    }
-
-    public boolean isSliding() {
-        return slideProgress < 1f && shownLines < revealedLines;
+    public int getHiddenHeight() {
+        if (slideProgress >= 1f || shownLines >= revealedLines) {
+            return 0;
+        }
+        return Math.max(0, paddedHeight(revealedLines) - animatedHeight());
     }
 
     public static int revealedLineCount(long[] lineStartTimes, long timeMs) {
@@ -99,7 +100,16 @@ public class RevealTextView extends View {
         int count = revealedLineCount(lineStartTimes, timeMs);
         if (count != revealedLines) {
             revealedLines = count;
-            startSlide();
+            if (timeMs == Long.MAX_VALUE) {
+                if (slideAnimator != null) {
+                    slideAnimator.cancel();
+                }
+                shownLines = revealedLines;
+                slideProgress = 1f;
+                requestLayout();
+            } else {
+                startSlide();
+            }
         }
         invalidate();
     }
@@ -108,7 +118,7 @@ public class RevealTextView extends View {
         if (slideAnimator != null) {
             slideAnimator.cancel();
         }
-        if (revealedLines < shownLines || !isAttachedToWindow()) {
+        if (revealedLines < shownLines || shownLines == 0 || !isAttachedToWindow()) {
             shownLines = revealedLines;
             slideProgress = 1f;
             requestLayout();
@@ -123,11 +133,22 @@ public class RevealTextView extends View {
             if (slideProgress >= 1f) {
                 shownLines = revealedLines;
             }
-            requestLayout();
-            invalidate();
+            invalidateRow();
         });
         slideAnimator.start();
         requestLayout();
+    }
+
+    private void invalidateRow() {
+        invalidate();
+        ViewParent row = getParent();
+        if (row instanceof View) {
+            ((View) row).invalidate();
+            ViewParent list = row.getParent();
+            if (list instanceof View) {
+                ((View) list).invalidate();
+            }
+        }
     }
 
     @Override
@@ -157,23 +178,45 @@ public class RevealTextView extends View {
         return from + Math.round((target - from) * slideProgress);
     }
 
-    private int animatedTextHeight() {
-        if (layout == null || revealedLines == 0) {
-            return 0;
-        }
-        int target = layout.getLineBottom(revealedLines - 1);
-        if (slideProgress >= 1f || shownLines >= revealedLines) {
-            return target;
-        }
-        int from = shownLines == 0 ? 0 : layout.getLineBottom(shownLines - 1);
-        return from + Math.round((target - from) * slideProgress);
-    }
-
     private void invalidateLayout() {
+        builtLayouts.clear();
         layout = null;
         layoutWidth = -1;
         requestLayout();
         invalidate();
+    }
+
+    private static class Built {
+        final StaticLayout layout;
+        final long[] lineStartTimes;
+
+        Built(StaticLayout layout, long[] lineStartTimes) {
+            this.layout = layout;
+            this.lineStartTimes = lineStartTimes;
+        }
+    }
+
+    private Built measureTurn(int width) {
+        String text = turn.getText();
+        StaticLayout built = StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
+                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, LINE_SPACING_MULTIPLIER)
+                .build();
+        int lines = built.getLineCount();
+        long[] times = new long[lines];
+        Arrays.fill(times, Long.MAX_VALUE);
+        for (int w = 0; w < turn.getWordCount(); w++) {
+            int line = built.getLineForOffset(turn.getWordCharOffset(w));
+            if (times[line] == Long.MAX_VALUE) {
+                times[line] = turn.getWordStartTime(w);
+            }
+        }
+        for (int i = 1; i < lines; i++) {
+            if (times[i] == Long.MAX_VALUE) {
+                times[i] = times[i - 1];
+            }
+        }
+        return new Built(built, times);
     }
 
     private void buildLayout(int width) {
@@ -184,36 +227,18 @@ public class RevealTextView extends View {
             revealedLines = 0;
             return;
         }
-        String text = turn.getText();
-        layout = StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-                .setLineSpacing(0f, LINE_SPACING_MULTIPLIER)
-                .build();
-        int lines = layout.getLineCount();
-        lineStartTimes = new long[lines];
-        Arrays.fill(lineStartTimes, Long.MAX_VALUE);
-        for (int w = 0; w < turn.getWordCount(); w++) {
-            int line = layout.getLineForOffset(turn.getWordCharOffset(w));
-            if (lineStartTimes[line] == Long.MAX_VALUE) {
-                lineStartTimes[line] = turn.getWordStartTime(w);
-            }
+        Built built = builtLayouts.get(width);
+        if (built == null) {
+            built = measureTurn(width);
+            builtLayouts.put(width, built);
         }
-        for (int i = 1; i < lines; i++) {
-            if (lineStartTimes[i] == Long.MAX_VALUE) {
-                lineStartTimes[i] = lineStartTimes[i - 1];
-            }
-        }
+        layout = built.layout;
+        lineStartTimes = built.lineStartTimes;
         revealedLines = revealedLineCount(lineStartTimes, revealTime);
         if (turnFresh) {
             turnFresh = false;
             shownLines = revealedLines;
             slideProgress = 1f;
-            if (animateIn && revealedLines > 0) {
-                shownLines = 0;
-                slideProgress = 0f;
-                post(this::startSlide);
-            }
-            animateIn = false;
         }
     }
 
@@ -228,7 +253,7 @@ public class RevealTextView extends View {
         if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY && layout != null) {
             measuredWidth = Math.min(measuredWidth, widestLine() + padding);
         }
-        int height = layout != null ? animatedHeight() : 0;
+        int height = layout != null ? paddedHeight(revealedLines) : 0;
         setMeasuredDimension(measuredWidth, resolveSize(height, heightMeasureSpec));
     }
 
@@ -245,24 +270,12 @@ public class RevealTextView extends View {
         if (layout == null || revealedLines == 0) {
             return;
         }
-        int textHeight = animatedTextHeight();
+        int textHeight = layout.getLineBottom(revealedLines - 1);
         int free = getHeight() - getPaddingTop() - getPaddingBottom() - textHeight;
         canvas.save();
         canvas.translate(getPaddingLeft(), getPaddingTop() + Math.max(0, free / 2f));
-        canvas.clipRect(0, 0, layoutWidth, textHeight);
-        int target = layout.getLineBottom(revealedLines - 1);
-        if (textHeight < target && shownLines < revealedLines) {
-            int split = shownLines == 0 ? 0 : layout.getLineBottom(shownLines - 1);
-            canvas.save();
-            canvas.clipRect(0, 0, layoutWidth, split);
-            layout.draw(canvas);
-            canvas.restore();
-            canvas.translate(0, target - textHeight);
-            canvas.clipRect(0, split, layoutWidth, target);
-            layout.draw(canvas);
-        } else {
-            layout.draw(canvas);
-        }
+        canvas.clipRect(0, 0, layoutWidth, textHeight - getHiddenHeight());
+        layout.draw(canvas);
         canvas.restore();
     }
 }

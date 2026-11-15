@@ -1,13 +1,15 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
 import android.content.Context;
+import android.graphics.Canvas;
 import android.util.AttributeSet;
-import android.view.View;
 import android.widget.LinearLayout;
 
 import de.danoeh.antennapod.R;
 
 public class TranscriptRowLayout extends LinearLayout {
+    private static final float UNBOUNDED = 10000f;
+
     public TranscriptRowLayout(Context context) {
         super(context);
     }
@@ -16,17 +18,21 @@ public class TranscriptRowLayout extends LinearLayout {
         super(context, attrs);
     }
 
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    public int getHiddenHeight() {
         RevealTextView text = findViewById(R.id.text);
-        View avatar = findViewById(R.id.avatar);
-        if (text == null || avatar == null) {
+        return text == null ? 0 : text.getHiddenHeight();
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        int hidden = getHiddenHeight();
+        if (hidden <= 0) {
+            super.dispatchDraw(canvas);
             return;
         }
-        if (text.isSliding()) {
-            int height = getPaddingTop() + getPaddingBottom() + text.getMeasuredHeight();
-            setMeasuredDimension(getMeasuredWidth(), Math.min(getMeasuredHeight(), height));
-        }
+        canvas.save();
+        canvas.clipRect(-UNBOUNDED, -UNBOUNDED, UNBOUNDED, getHeight() - hidden);
+        super.dispatchDraw(canvas);
+        canvas.restore();
     }
 }

@@ -26,8 +26,10 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.session.MediaController;
+import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.palette.graphics.Palette;
 import com.bumptech.glide.Glide;
@@ -151,7 +153,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private final TranscriptRowAdapter adapter = new TranscriptRowAdapter();
     private final Choreographer.FrameCallback frameCallback = frameTimeNanos -> onFrame();
 
-    private RecyclerView transcriptList;
+    private TranscriptListView transcriptList;
     private LinearLayoutManager layoutManager;
     private ImageView coverImage;
     private TextView episodeTitle;
@@ -179,6 +181,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private long hashedMediaId = -1;
     private String hashedValue;
     private float speed = 1.0f;
+    private boolean alignPending = false;
     private boolean jumpPending = true;
     private boolean modelReady = false;
     private boolean started = false;
@@ -235,11 +238,26 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         layoutManager.setStackFromEnd(true);
         transcriptList.setLayoutManager(layoutManager);
         transcriptList.setAdapter(adapter);
-        DefaultItemAnimator animator = new DefaultItemAnimator();
+        DefaultItemAnimator animator = new DefaultItemAnimator() {
+            @Override
+            public boolean animatePersistence(@NonNull RecyclerView.ViewHolder viewHolder,
+                                              @NonNull RecyclerView.ItemAnimator.ItemHolderInfo preInfo,
+                                              @NonNull RecyclerView.ItemAnimator.ItemHolderInfo postInfo) {
+                dispatchMoveFinished(viewHolder);
+                return false;
+            }
+
+            @Override
+            public boolean animateChange(RecyclerView.ViewHolder oldHolder, RecyclerView.ViewHolder newHolder,
+                                         int fromX, int fromY, int toX, int toY) {
+                if (oldHolder == newHolder) {
+                    dispatchChangeFinished(oldHolder, true);
+                    return false;
+                }
+                return super.animateChange(oldHolder, newHolder, fromX, fromY, toX, toY);
+            }
+        };
         animator.setSupportsChangeAnimations(false);
-        animator.setAddDuration(0);
-        animator.setMoveDuration(RevealTextView.SLIDE_DURATION_MS);
-        animator.setRemoveDuration(RevealTextView.SLIDE_DURATION_MS);
         transcriptList.setItemAnimator(animator);
         transcriptList.getViewTreeObserver().addOnPreDrawListener(this::updateStickyAvatars);
         transcriptList.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
@@ -249,7 +267,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private boolean updateStickyAvatars() {
         pinToEnd();
         float listTop = transcriptList.getPaddingTop()
-                + getResources().getDimension(R.dimen.fullscreen_transcript_edge_gap);
+                + getResources().getDimension(R.dimen.fullscreen_transcript_edge_gap)
+                - transcriptList.getSlideOffset();
         for (int i = 0; i < transcriptList.getChildCount(); i++) {
             View row = transcriptList.getChildAt(i);
             View avatar = row.findViewById(R.id.avatar);
@@ -271,7 +290,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private void pinToEnd() {
-        if (!modelReady || jumpPending || transcriptList.isLayoutRequested()) {
+        if (!modelReady || jumpPending || transcriptList.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
             return;
         }
         int last = adapter.getItemCount() - 1;
@@ -484,6 +503,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (!modelReady) {
             return;
         }
+        alignToEnd();
         long now = SystemClock.elapsedRealtime();
         long time = clock.positionAt(now);
         boolean jump = jumpPending;
@@ -491,6 +511,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             return;
         }
         lastTime = time;
+        final int previousCount = adapter.getItemCount();
         adapter.setTime(time);
         updateProgress(time);
         int count = adapter.getItemCount();
@@ -499,8 +520,39 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         if (jump) {
             jumpPending = false;
+            alignPending = true;
             transcriptList.stopScroll();
             layoutManager.scrollToPositionWithOffset(count - 1, 0);
+        } else if (count != previousCount) {
+            alignPending = true;
+            smoothScrollToEnd(count - 1);
+        }
+    }
+
+    private void smoothScrollToEnd(int position) {
+        LinearSmoothScroller scroller = new LinearSmoothScroller(this) {
+            @Override
+            protected int getVerticalSnapPreference() {
+                return SNAP_TO_END;
+            }
+        };
+        scroller.setTargetPosition(position);
+        layoutManager.startSmoothScroll(scroller);
+    }
+
+    private void alignToEnd() {
+        if (!alignPending || jumpPending || transcriptList.isLayoutRequested()
+                || transcriptList.getScrollState() != RecyclerView.SCROLL_STATE_IDLE
+                || transcriptList.isAnimating()) {
+            return;
+        }
+        int remaining = transcriptList.computeVerticalScrollRange()
+                - transcriptList.computeVerticalScrollExtent()
+                - transcriptList.computeVerticalScrollOffset();
+        if (remaining > 0) {
+            transcriptList.smoothScrollBy(0, remaining);
+        } else {
+            alignPending = false;
         }
     }
 

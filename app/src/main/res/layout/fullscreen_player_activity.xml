@@ -21,7 +21,7 @@
             android:orientation="horizontal"
             android:weightSum="100">
 
-            <androidx.recyclerview.widget.RecyclerView
+            <de.danoeh.antennapod.ui.screen.playback.fullscreen.TranscriptListView
                 android:id="@+id/transcriptList"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"

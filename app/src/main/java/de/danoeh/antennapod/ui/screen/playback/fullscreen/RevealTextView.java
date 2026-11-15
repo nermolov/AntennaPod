@@ -168,7 +168,17 @@ public class RevealTextView extends View {
         if (lines == 0 || layout == null) {
             return 0;
         }
-        return Math.max(layout.getLineBottom(lines - 1) + getPaddingTop() + getPaddingBottom(), getMinimumHeight());
+        return Math.max(textBottom(lines) + getPaddingTop() + getPaddingBottom(), getMinimumHeight());
+    }
+
+    private int textBottom(int lines) {
+        int index = lines - 1;
+        int lastIndex = layout.getLineCount() - 1;
+        if (index >= lastIndex) {
+            return layout.getLineBottom(lastIndex);
+        }
+        int lastDescent = layout.getLineBottom(lastIndex) - layout.getLineBaseline(lastIndex);
+        return layout.getLineBaseline(index) + lastDescent;
     }
 
     private int animatedHeight() {
@@ -281,7 +291,7 @@ public class RevealTextView extends View {
         if (layout == null || revealedLines == 0) {
             return;
         }
-        int textHeight = layout.getLineBottom(revealedLines - 1);
+        int textHeight = textBottom(revealedLines);
         int free = getHeight() - getPaddingTop() - getPaddingBottom() - textHeight;
         canvas.save();
         canvas.translate(getPaddingLeft(), getPaddingTop() + Math.max(0, free / 2f));

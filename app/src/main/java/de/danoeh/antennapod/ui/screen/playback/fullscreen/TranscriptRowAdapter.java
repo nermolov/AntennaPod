@@ -100,7 +100,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         int speaker = turn.getSpeakerIndex();
         holder.avatar.setImageDrawable(new SpeakerAvatarDrawable(speaker, avatarTypeface, density));
         holder.avatar.setContentDescription(context.getString(R.string.transcript_speaker_number, speaker + 1));
-        holder.text.setBackground(new ShadowedRoundRectDrawable(
+        holder.text.setBubble(new ShadowedRoundRectDrawable(
                 PlayerColorScheme.bubble(SpeakerAvatarDrawable.colorFor(speaker)),
                 BUBBLE_CORNER_DP * density, density, BUBBLE_SHADOW_DY_DP * density,
                 BUBBLE_SHADOW_BLUR_DP * density, BUBBLE_SHADOW_COLOR));

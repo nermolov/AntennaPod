@@ -4,6 +4,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
@@ -30,6 +31,7 @@ public class RevealTextView extends View {
     private float slideProgress = 1f;
     private boolean turnFresh = true;
     private ValueAnimator slideAnimator;
+    private Drawable bubble;
 
     public RevealTextView(Context context) {
         this(context, null);
@@ -265,8 +267,17 @@ public class RevealTextView extends View {
         return (int) Math.ceil(widest);
     }
 
+    public void setBubble(Drawable bubble) {
+        this.bubble = bubble;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
+        if (bubble != null) {
+            bubble.setBounds(0, 0, getWidth(), getHeight() - getHiddenHeight());
+            bubble.draw(canvas);
+        }
         if (layout == null || revealedLines == 0) {
             return;
         }

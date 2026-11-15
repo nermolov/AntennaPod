@@ -49,8 +49,8 @@
 
       emulatorTv = pkgs.androidenv.emulateApp {
         name = "antennapod-tv-emulator";
-        platformVersion = "36";
-        abiVersion = "x86_64";
+        platformVersion = "25";
+        abiVersion = "x86";
         systemImageType = "android-tv";
         deviceName = "tv";
         androidUserHome = "$PWD/.android-nix";

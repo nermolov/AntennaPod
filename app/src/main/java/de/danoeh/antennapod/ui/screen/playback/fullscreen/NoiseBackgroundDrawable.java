@@ -18,7 +18,7 @@ public class NoiseBackgroundDrawable extends Drawable {
     private static final int TILE_SIZE = 256;
     private static final float NOISE_OPACITY = 1f;
     private static final long SEED = 1L;
-    private static final float BLUR_SIGMA_PER_DENSITY = 1f;
+    private static final float BLUR_SIGMA_PER_DENSITY = 0.75f;
 
     private final Paint fillPaint = new Paint();
     private final Paint noisePaint = new Paint(Paint.FILTER_BITMAP_FLAG);
@@ -32,7 +32,7 @@ public class NoiseBackgroundDrawable extends Drawable {
         for (int i = 0; i < alphas.length; i++) {
             alphas[i] = random.nextFloat();
         }
-        blur(alphas, Math.max(1f, density * BLUR_SIGMA_PER_DENSITY));
+        blur(alphas, Math.max(0.75f, density * BLUR_SIGMA_PER_DENSITY));
         int[] pixels = new int[alphas.length];
         int red = Color.red(noiseColor);
         int green = Color.green(noiseColor);

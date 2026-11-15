@@ -7,7 +7,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +33,7 @@ public final class ServiceTranscriptParser {
                 raw.add(turn);
             }
         }
-        Collections.sort(raw, Comparator.comparingLong(t -> t.start));
+        Collections.sort(raw, (a, b) -> Long.compare(a.start, b.start));
         Map<String, Integer> speakerIndices = new HashMap<>();
         List<DiarizedTranscript.Turn> turns = new ArrayList<>();
         for (RawTurn turn : raw) {

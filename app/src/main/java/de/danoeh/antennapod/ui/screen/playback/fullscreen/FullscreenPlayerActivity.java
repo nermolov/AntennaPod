@@ -1,11 +1,14 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
+import android.content.Context;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Outline;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Choreographer;
 import android.view.KeyEvent;
@@ -88,6 +91,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final long SEEK_THROTTLE_MS = 300;
     private static final long POLL_INTERVAL_SECONDS = 3;
     private static final int PROGRESS_MAX = 1000;
+    private static final int DESIGN_WIDTH_DP = 1280;
+    private static final float DESIGN_SCALE = 0.95f;
+    private static final int MIN_DENSITY_DPI = 120;
+    private static final int MAX_DENSITY_DPI = 640;
     private static final int COLOR_TITLE = 0xFFFFFFFF;
     private static final int COLOR_TITLE_DIM = 0x80FFFFFF;
 
@@ -182,6 +189,17 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private long lastDisplayedSecond = -1;
     private long lastDisplayedDuration = -1;
     private long lastSeekKeyTime = 0;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        DisplayMetrics metrics = newBase.getResources().getDisplayMetrics();
+        int longEdgePx = Math.max(metrics.widthPixels, metrics.heightPixels);
+        int designDpi = Math.round(longEdgePx * (float) DisplayMetrics.DENSITY_DEFAULT / DESIGN_WIDTH_DP
+                * DESIGN_SCALE);
+        Configuration configuration = new Configuration(newBase.getResources().getConfiguration());
+        configuration.densityDpi = Math.max(MIN_DENSITY_DPI, Math.min(MAX_DENSITY_DPI, designDpi));
+        super.attachBaseContext(newBase.createConfigurationContext(configuration));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

@@ -28,7 +28,6 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.media3.session.MediaController;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.palette.graphics.Palette;
 import com.bumptech.glide.Glide;
@@ -181,7 +180,6 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private String hashedValue;
     private float speed = 1.0f;
     private boolean jumpPending = true;
-    private boolean alignPending = false;
     private boolean modelReady = false;
     private boolean started = false;
     private int lastListHeight = -1;
@@ -239,6 +237,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         transcriptList.setAdapter(adapter);
         DefaultItemAnimator animator = new DefaultItemAnimator();
         animator.setSupportsChangeAnimations(false);
+        animator.setAddDuration(RevealTextView.SLIDE_DURATION_MS);
+        animator.setMoveDuration(RevealTextView.SLIDE_DURATION_MS);
+        animator.setRemoveDuration(RevealTextView.SLIDE_DURATION_MS);
         transcriptList.setItemAnimator(animator);
         transcriptList.getViewTreeObserver().addOnPreDrawListener(this::updateStickyAvatars);
         transcriptList.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
@@ -246,7 +247,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private boolean updateStickyAvatars() {
-        int listTop = transcriptList.getPaddingTop();
+        pinToEnd();
+        float listTop = transcriptList.getPaddingTop()
+                + getResources().getDimension(R.dimen.fullscreen_transcript_edge_gap);
         for (int i = 0; i < transcriptList.getChildCount(); i++) {
             View row = transcriptList.getChildAt(i);
             View avatar = row.findViewById(R.id.avatar);
@@ -254,7 +257,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 continue;
             }
             float translation = 0;
-            int avatarTop = row.getTop() + avatar.getTop();
+            float avatarTop = row.getY() + avatar.getTop();
             if (avatarTop < listTop) {
                 float maxTranslation = row.getHeight() - row.getPaddingBottom()
                         - avatar.getTop() - avatar.getHeight();
@@ -265,6 +268,21 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             }
         }
         return true;
+    }
+
+    private void pinToEnd() {
+        if (!modelReady || jumpPending || transcriptList.isLayoutRequested()) {
+            return;
+        }
+        int last = adapter.getItemCount() - 1;
+        View lastRow = last >= 0 ? layoutManager.findViewByPosition(last) : null;
+        if (lastRow == null) {
+            return;
+        }
+        int remaining = lastRow.getBottom() - (transcriptList.getHeight() - transcriptList.getPaddingBottom());
+        if (remaining != 0) {
+            transcriptList.scrollBy(0, remaining);
+        }
     }
 
     private void hideSystemBars() {
@@ -466,7 +484,6 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (!modelReady) {
             return;
         }
-        alignToEnd();
         long now = SystemClock.elapsedRealtime();
         long time = clock.positionAt(now);
         boolean jump = jumpPending;
@@ -474,7 +491,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             return;
         }
         lastTime = time;
-        boolean changed = adapter.setTime(time);
+        adapter.setTime(time);
         updateProgress(time);
         int count = adapter.getItemCount();
         if (count == 0) {
@@ -482,39 +499,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         if (jump) {
             jumpPending = false;
-            alignPending = true;
             transcriptList.stopScroll();
             layoutManager.scrollToPositionWithOffset(count - 1, 0);
-        } else if (changed) {
-            alignPending = true;
-            smoothScrollToEnd(count - 1);
-        }
-    }
-
-    private void smoothScrollToEnd(int position) {
-        LinearSmoothScroller scroller = new LinearSmoothScroller(this) {
-            @Override
-            protected int getVerticalSnapPreference() {
-                return SNAP_TO_END;
-            }
-        };
-        scroller.setTargetPosition(position);
-        layoutManager.startSmoothScroll(scroller);
-    }
-
-    private void alignToEnd() {
-        if (!alignPending || jumpPending || transcriptList.isLayoutRequested()
-                || transcriptList.getScrollState() != RecyclerView.SCROLL_STATE_IDLE
-                || transcriptList.isAnimating()) {
-            return;
-        }
-        int remaining = transcriptList.computeVerticalScrollRange()
-                - transcriptList.computeVerticalScrollExtent()
-                - transcriptList.computeVerticalScrollOffset();
-        if (remaining > 0) {
-            transcriptList.smoothScrollBy(0, remaining);
-        } else {
-            alignPending = false;
         }
     }
 

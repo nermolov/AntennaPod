@@ -27,6 +27,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
     private long currentTime = 0;
     private int trackedIndex = -1;
     private int trackedWords = -1;
+    private int animateInPosition = -1;
 
     public TranscriptRowAdapter() {
         setHasStableIds(true);
@@ -47,10 +48,12 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
             return false;
         }
         int oldCount = visibleCount;
+        animateInPosition = -1;
         int newCount = model.visibleTurnCountAt(timeMs);
         boolean changed = false;
         if (newCount > oldCount) {
             visibleCount = newCount;
+            animateInPosition = newCount - oldCount == 1 ? oldCount : -1;
             notifyItemRangeInserted(oldCount, newCount - oldCount);
             changed = true;
         } else if (newCount < oldCount) {
@@ -107,6 +110,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
                 R.color.fullscreen_player_bubble_text, context.getTheme()));
         holder.text.setTextSizePx(context.getResources().getDimension(R.dimen.fullscreen_transcript_text_size));
         holder.text.setTurn(turn);
+        holder.text.setAnimateIn(position == animateInPosition);
         applyReveal(holder, position);
     }
 

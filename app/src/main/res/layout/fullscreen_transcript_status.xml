@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/statusOverlay"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:paddingHorizontal="48dp"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/statusTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <ProgressBar
+        android:id="@+id/statusProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:layout_marginHorizontal="96dp"
+        android:layout_marginTop="20dp"
+        android:focusable="false"
+        android:max="1000"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/statusDetail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textColor="#B3FFFFFF"
+        android:textSize="22sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/statusButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/statusPrimaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:minHeight="64dp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_tv_button"
+            android:focusable="true"
+            android:minWidth="220dp"
+            android:paddingHorizontal="32dp"
+            android:stateListAnimator="@null"
+            android:textAllCaps="false"
+            android:textColor="@color/tv_button_text"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/statusSecondaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:minHeight="64dp"
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_tv_button"
+            android:focusable="true"
+            android:minWidth="220dp"
+            android:paddingHorizontal="32dp"
+            android:stateListAnimator="@null"
+            android:textAllCaps="false"
+            android:textColor="@color/tv_button_text"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</LinearLayout>

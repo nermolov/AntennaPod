@@ -1,53 +1,27 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
-import de.danoeh.antennapod.model.feed.Transcript;
-import de.danoeh.antennapod.model.feed.TranscriptSegment;
+import de.danoeh.antennapod.model.feed.DiarizedTranscript;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class LiveTranscriptModel {
     private final List<Turn> turns = new ArrayList<>();
     private final int speakerCount;
 
-    public LiveTranscriptModel(Transcript transcript) {
-        Map<String, Integer> speakerIndices = new HashMap<>();
-        Turn.Builder current = null;
-        for (int i = 0; i < transcript.getSegmentCount(); i++) {
-            TranscriptSegment segment = transcript.getSegmentAt(i);
-            String text = segment.getWords() == null ? "" : segment.getWords().trim();
-            if (text.isEmpty()) {
+    public LiveTranscriptModel(DiarizedTranscript transcript) {
+        for (DiarizedTranscript.Turn source : transcript.getTurns()) {
+            if (source.getWords().length == 0) {
                 continue;
             }
-            String speaker = segment.getSpeaker();
-            if (current == null || !equal(current.speaker, speaker)) {
-                if (current != null) {
-                    turns.add(current.build());
-                }
-                Integer index = speakerIndices.get(speaker);
-                if (index == null) {
-                    index = speakerIndices.size();
-                    speakerIndices.put(speaker, index);
-                }
-                current = new Turn.Builder(speaker, index);
+            Turn.Builder builder = new Turn.Builder(source.getSpeaker(), source.getSpeakerIndex());
+            for (int i = 0; i < source.getWords().length; i++) {
+                builder.add(source.getWords()[i], source.getStartMs()[i]);
+                builder.endTime = Math.max(builder.endTime, source.getEndMs()[i]);
             }
-            String[] words = text.split("\\s+");
-            long length = Math.max(0, segment.getEndTime() - segment.getStartTime());
-            for (int w = 0; w < words.length; w++) {
-                current.add(words[w], segment.getStartTime() + length * w / words.length);
-            }
-            current.endTime = Math.max(current.endTime, segment.getEndTime());
+            turns.add(builder.build());
         }
-        if (current != null) {
-            turns.add(current.build());
-        }
-        speakerCount = speakerIndices.size();
-    }
-
-    private static boolean equal(String a, String b) {
-        return a == null ? b == null : a.equals(b);
+        speakerCount = transcript.getSpeakerCount();
     }
 
     public int getTurnCount() {

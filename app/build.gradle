@@ -64,6 +64,7 @@ dependencies {
     implementation project(':net:download:service-interface')
     implementation project(':net:download:service')
     implementation project(':net:ssl')
+    implementation project(':net:transcription')
     implementation project(':net:sync:service')
     playImplementation project(':net:sync:wear-interface')
     implementation project(':parser:feed')

@@ -8,9 +8,12 @@ import android.view.Choreographer;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -23,18 +26,29 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.event.EpisodeDownloadEvent;
 import de.danoeh.antennapod.event.PlayerErrorEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.event.playback.PlaybackServiceEvent;
 import de.danoeh.antennapod.event.playback.SpeedChangedEvent;
+import de.danoeh.antennapod.model.feed.DiarizedTranscript;
+import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.playback.Playable;
+import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
+import de.danoeh.antennapod.net.transcription.JobStatus;
+import de.danoeh.antennapod.net.transcription.Lookup;
+import de.danoeh.antennapod.net.transcription.SubmitResult;
+import de.danoeh.antennapod.net.transcription.TranscriptionClient;
+import de.danoeh.antennapod.net.transcription.TranscriptionException;
+import de.danoeh.antennapod.parser.transcript.ServiceTranscriptParser;
 import de.danoeh.antennapod.playback.service.PlaybackController;
 import de.danoeh.antennapod.playback.service.PlaybackServiceInterface;
 import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
+import de.danoeh.antennapod.storage.database.GeneratedTranscript;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.common.Converter;
@@ -44,17 +58,81 @@ import de.danoeh.antennapod.ui.episodes.TimeSpeedConverter;
 import de.danoeh.antennapod.ui.screen.playback.MediaPlayerErrorDialog;
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.Maybe;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+import org.json.JSONException;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final String TAG = "FullscreenPlayer";
     private static final long SEEK_THROTTLE_MS = 300;
     private static final float VISIBLE_LINES = 5.6f;
     private static final float LINE_HEIGHT_RATIO = 1.17f;
+    private static final long POLL_INTERVAL_SECONDS = 3;
+    private static final int PROGRESS_MAX = 1000;
+    private static final int COLOR_TITLE = 0xFFFFFFFF;
+    private static final int COLOR_TITLE_DIM = 0x80FFFFFF;
+
+    private enum State { LOADING, PROMPT, PROMPT_DOWNLOAD, DOWNLOADING, PROGRESS, TRANSCRIPT, NONE, FAILED }
+
+    private enum Retry { LOOKUP, SUBMIT, DOWNLOAD }
+
+    private static class Outcome {
+        final State state;
+        final String jobId;
+        final DiarizedTranscript transcript;
+        final String message;
+        final Retry retry;
+
+        Outcome(State state, String jobId, DiarizedTranscript transcript, String message, Retry retry) {
+            this.state = state;
+            this.jobId = jobId;
+            this.transcript = transcript;
+            this.message = message;
+            this.retry = retry;
+        }
+
+        static Outcome of(State state) {
+            return new Outcome(state, null, null, null, null);
+        }
+
+        static Outcome progress(String jobId) {
+            return new Outcome(State.PROGRESS, jobId, null, null, null);
+        }
+
+        static Outcome transcript(DiarizedTranscript transcript) {
+            return new Outcome(State.TRANSCRIPT, null, transcript, null, null);
+        }
+
+        static Outcome failed(String message, Retry retry) {
+            return new Outcome(State.FAILED, null, null, message, retry);
+        }
+    }
+
+    private enum PollKind { UPDATE, UNREACHABLE, FINISHED, LOST }
+
+    private static class PollResult {
+        final PollKind kind;
+        final JobStatus status;
+        final Outcome outcome;
+
+        PollResult(PollKind kind, JobStatus status, Outcome outcome) {
+            this.kind = kind;
+            this.status = status;
+            this.outcome = outcome;
+        }
+    }
 
     private final PlaybackClock clock = new PlaybackClock();
     private final TranscriptRowAdapter adapter = new TranscriptRowAdapter();
@@ -68,9 +146,25 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private ProgressBar progress;
     private TextView elapsedText;
     private TextView durationText;
+    private View statusOverlay;
+    private TextView statusTitle;
+    private ProgressBar statusProgress;
+    private TextView statusDetail;
+    private LinearLayout statusButtons;
+    private Button primaryButton;
+    private Button secondaryButton;
 
     private FeedMedia media;
     private Disposable disposable;
+    private Disposable workDisposable;
+    private Disposable pollDisposable;
+    private State state = State.LOADING;
+    private Retry retry = Retry.LOOKUP;
+    private String jobId;
+    private boolean resumeAfter = false;
+    private boolean downloadSeen = false;
+    private long hashedMediaId = -1;
+    private String hashedValue;
     private float speed = 1.0f;
     private boolean jumpPending = true;
     private boolean alignPending = false;
@@ -98,6 +192,13 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         progress = findViewById(R.id.progress);
         elapsedText = findViewById(R.id.elapsedText);
         durationText = findViewById(R.id.durationText);
+        statusOverlay = findViewById(R.id.statusOverlay);
+        statusTitle = findViewById(R.id.statusTitle);
+        statusProgress = findViewById(R.id.statusProgress);
+        statusDetail = findViewById(R.id.statusDetail);
+        statusButtons = findViewById(R.id.statusButtons);
+        primaryButton = findViewById(R.id.statusPrimaryButton);
+        secondaryButton = findViewById(R.id.statusSecondaryButton);
 
         layoutManager = new LinearLayoutManager(this);
         layoutManager.setStackFromEnd(true);
@@ -177,29 +278,16 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (disposable != null) {
             disposable.dispose();
         }
-    }
-
-    private static class Loaded {
-        final FeedMedia media;
-        final LiveTranscriptModel model;
-
-        Loaded(FeedMedia media, LiveTranscriptModel model) {
-            this.media = media;
-            this.model = model;
-        }
+        stopWork();
+        stopPolling();
     }
 
     private void loadMedia() {
         if (disposable != null) {
             disposable.dispose();
         }
-        disposable = Maybe.fromCallable(() -> {
-            FeedMedia loaded = DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
-            if (loaded == null) {
-                return null;
-            }
-            return new Loaded(loaded, new LiveTranscriptModel(
-                    FakeTranscriptGenerator.generate(loaded.getId(), loaded.getDuration())));
+        disposable = Maybe.<FeedMedia>fromCallable(() -> {
+            return DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -208,9 +296,17 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                         this::finish);
     }
 
-    private void onLoaded(Loaded loaded) {
-        final boolean sameMedia = media != null && media.getId() == loaded.media.getId();
-        media = loaded.media;
+    private void onLoaded(FeedMedia loaded) {
+        final boolean sameMedia = media != null && media.getId() == loaded.getId();
+        if (!sameMedia) {
+            stopWork();
+            stopPolling();
+            state = State.LOADING;
+            jobId = null;
+            resumeAfter = false;
+            downloadSeen = false;
+        }
+        media = loaded;
         episodeTitle.setText(media.getEpisodeTitle());
         feedTitle.setText(media.getFeedTitle());
         loadCover();
@@ -221,13 +317,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         clock.setPlaying(isPlaybackActive(), now);
         if (!sameMedia || !modelReady) {
             clock.update(media.getPosition(), now);
-            adapter.setModel(loaded.model);
+            adapter.setModel(new LiveTranscriptModel(new DiarizedTranscript(Collections.emptyList())));
             modelReady = true;
             jumpPending = true;
             lastTime = -1;
             lastDisplayedSecond = -1;
             lastDisplayedDuration = -1;
         }
+        resumeState();
     }
 
     private void loadCover() {
@@ -264,6 +361,20 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onPlayerStatus(PlayerStatusEvent event) {
         clock.setPlaying(isPlaybackActive(), SystemClock.elapsedRealtime());
+        if (media == null) {
+            return;
+        }
+        long playingId = PlaybackPreferences.getCurrentlyPlayingFeedMediaId();
+        if (playingId > 0 && playingId != media.getId()) {
+            loadMedia();
+        } else if (isPlaybackBlocked() && isPlaybackActive()) {
+            setPlaying(false);
+        }
+    }
+
+    @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
+    public void onEpisodeDownload(EpisodeDownloadEvent event) {
+        checkDownload();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -363,20 +474,46 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
     }
 
+    private boolean buttonsVisible() {
+        return statusOverlay.getVisibility() == View.VISIBLE && statusButtons.getVisibility() == View.VISIBLE;
+    }
+
+    private boolean isPlaybackBlocked() {
+        return state == State.PROGRESS || state == State.DOWNLOADING;
+    }
+
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (buttonsVisible()) {
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                case KeyEvent.KEYCODE_DPAD_UP:
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    if (getCurrentFocus() == null || !isButton(getCurrentFocus())) {
+                        primaryButton.requestFocus();
+                        return true;
+                    }
+                    return super.onKeyDown(keyCode, event);
+                default:
+                    break;
+            }
+        }
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
             case KeyEvent.KEYCODE_NUMPAD_ENTER:
             case KeyEvent.KEYCODE_SPACE:
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                if (event.getRepeatCount() == 0) {
+                if (event.getRepeatCount() == 0 && !isPlaybackBlocked()) {
                     setPlaying(!clock.isPlaying());
                 }
                 return true;
             case KeyEvent.KEYCODE_MEDIA_PLAY:
-                if (event.getRepeatCount() == 0) {
+                if (event.getRepeatCount() == 0 && !isPlaybackBlocked()) {
                     setPlaying(true);
                 }
                 return true;
@@ -387,11 +524,15 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_MEDIA_REWIND:
-                seek(false);
+                if (!isPlaybackBlocked()) {
+                    seek(false);
+                }
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
-                seek(true);
+                if (!isPlaybackBlocked()) {
+                    seek(true);
+                }
                 return true;
             case KeyEvent.KEYCODE_DPAD_UP:
             case KeyEvent.KEYCODE_DPAD_DOWN:
@@ -399,6 +540,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             default:
                 return super.onKeyDown(keyCode, event);
         }
+    }
+
+    private boolean isButton(View view) {
+        return view == primaryButton || view == secondaryButton;
     }
 
     private void setPlaying(boolean play) {
@@ -445,5 +590,545 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         target.setPosition(position);
         DBWriter.setFeedMediaPlaybackInformation(target);
         EventBus.getDefault().post(new PlaybackPositionEvent(target.getPosition(), target.getDuration()));
+    }
+
+    private boolean isRunning(@Nullable Disposable d) {
+        return d != null && !d.isDisposed();
+    }
+
+    private void stopWork() {
+        if (workDisposable != null) {
+            workDisposable.dispose();
+            workDisposable = null;
+        }
+    }
+
+    private void stopPolling() {
+        if (pollDisposable != null) {
+            pollDisposable.dispose();
+            pollDisposable = null;
+        }
+    }
+
+    private void resumeState() {
+        if (!started || media == null) {
+            return;
+        }
+        switch (state) {
+            case LOADING:
+                startLookup();
+                break;
+            case PROGRESS:
+                if (jobId != null) {
+                    showProgress(null);
+                    startPolling();
+                } else {
+                    startSubmit();
+                }
+                break;
+            case DOWNLOADING:
+                showDownloading(DownloadServiceInterface.get().getProgress(media.getDownloadUrl()));
+                checkDownload();
+                break;
+            default:
+                renderCurrentState();
+                break;
+        }
+    }
+
+    private void renderCurrentState() {
+        switch (state) {
+            case PROMPT:
+                showPrompt();
+                break;
+            case PROMPT_DOWNLOAD:
+                showDownloadPrompt();
+                break;
+            case TRANSCRIPT:
+                statusOverlay.setVisibility(View.GONE);
+                break;
+            case NONE:
+                showStatus(getString(R.string.no_transcript_label), COLOR_TITLE_DIM, null, -2, 0, null, 0, null);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void showStatus(CharSequence title, int titleColor, @Nullable CharSequence detail, int progressPercent,
+                            int primaryLabel, @Nullable Runnable primaryAction,
+                            int secondaryLabel, @Nullable Runnable secondaryAction) {
+        statusOverlay.setVisibility(View.VISIBLE);
+        statusTitle.setText(title);
+        statusTitle.setTextColor(titleColor);
+        if (detail == null) {
+            statusDetail.setVisibility(View.GONE);
+        } else {
+            statusDetail.setText(detail);
+            statusDetail.setVisibility(View.VISIBLE);
+        }
+        if (progressPercent == -2) {
+            statusProgress.setVisibility(View.GONE);
+        } else {
+            statusProgress.setVisibility(View.VISIBLE);
+            statusProgress.setIndeterminate(progressPercent < 0);
+            if (progressPercent >= 0) {
+                statusProgress.setProgress(progressPercent * PROGRESS_MAX / 100);
+            }
+        }
+        bindButton(primaryButton, primaryLabel, primaryAction);
+        bindButton(secondaryButton, secondaryLabel, secondaryAction);
+        boolean any = primaryLabel != 0;
+        statusButtons.setVisibility(any ? View.VISIBLE : View.GONE);
+        if (any) {
+            View focused = getCurrentFocus();
+            if (focused == null || !isButton(focused) || focused.getVisibility() != View.VISIBLE) {
+                primaryButton.requestFocus();
+            }
+        }
+    }
+
+    private void bindButton(Button button, int label, @Nullable Runnable action) {
+        if (label == 0 || action == null) {
+            button.setVisibility(View.GONE);
+            button.setOnClickListener(null);
+            return;
+        }
+        button.setText(label);
+        button.setOnClickListener(v -> action.run());
+        button.setVisibility(View.VISIBLE);
+    }
+
+    private void showLoading() {
+        showStatus(getString(R.string.transcript_checking), COLOR_TITLE, null, -1, 0, null, 0, null);
+    }
+
+    private void showPrompt() {
+        int minutes = TranscriptionProgressFormatter.estimateMinutes(media.getDuration());
+        showStatus(getString(R.string.transcript_prompt_title), COLOR_TITLE,
+                getString(R.string.transcript_prompt_estimate, minutes), -2,
+                R.string.transcript_transcribe_label, this::startSubmit,
+                R.string.transcript_not_now_label, this::declineTranscript);
+    }
+
+    private void showDownloadPrompt() {
+        showStatus(getString(R.string.transcript_download_prompt_title), COLOR_TITLE, null, -2,
+                R.string.transcript_download_and_transcribe_label, this::startDownload,
+                R.string.transcript_not_now_label, this::declineTranscript);
+    }
+
+    private void showDownloading(int percent) {
+        showStatus(getString(R.string.transcript_downloading_title), COLOR_TITLE,
+                percent >= 0 ? getString(R.string.percentage_format, percent) : null, Math.max(percent, -1), 0, null,
+                0, null);
+    }
+
+    private void showProgress(@Nullable JobStatus status) {
+        if (status == null) {
+            showStatus(getString(R.string.transcript_progress_title), COLOR_TITLE, null, -1, 0, null, 0, null);
+            return;
+        }
+        String stage = getString(TranscriptionProgressFormatter.stageLabel(status.status, status.stage));
+        int percent = TranscriptionProgressFormatter.percent(status.overallProgress);
+        boolean queued = TranscriptionProgressFormatter.isQueued(status.status);
+        String detail = stage;
+        if (queued && status.queuePosition != null && status.queuePosition > 0) {
+            detail = getString(R.string.transcript_detail_format, stage,
+                    getString(R.string.transcript_queue_ahead, status.queuePosition));
+        } else if (!queued && percent >= 0) {
+            detail = getString(R.string.transcript_detail_format, stage,
+                    getString(R.string.percentage_format, percent));
+        }
+        showStatus(getString(R.string.transcript_progress_title), COLOR_TITLE, detail, queued ? -1 : percent,
+                queued ? R.string.transcript_cancel_label : 0, queued ? this::cancelJob : null, 0, null);
+    }
+
+    private void showFailed(String title, @Nullable String message, Retry retryMode) {
+        retry = retryMode;
+        showStatus(title, COLOR_TITLE, message, -2,
+                R.string.transcript_retry_label, this::retryAfterFailure,
+                R.string.transcript_not_now_label, this::declineTranscript);
+    }
+
+    private void declineTranscript() {
+        stopWork();
+        stopPolling();
+        enterNone();
+    }
+
+    private void enterNone() {
+        state = State.NONE;
+        renderCurrentState();
+    }
+
+    private void retryAfterFailure() {
+        switch (retry) {
+            case SUBMIT:
+                startSubmit();
+                break;
+            case DOWNLOAD:
+                startDownload();
+                break;
+            default:
+                startLookup();
+                break;
+        }
+    }
+
+    private void pauseForWork() {
+        resumeAfter = resumeAfter || isPlaybackActive();
+        setPlaying(false);
+    }
+
+    private void applyOutcome(Outcome outcome) {
+        switch (outcome.state) {
+            case TRANSCRIPT:
+                showTranscript(outcome.transcript);
+                break;
+            case PROGRESS:
+                enterProgress(outcome.jobId);
+                break;
+            case PROMPT:
+                state = State.PROMPT;
+                showPrompt();
+                break;
+            case PROMPT_DOWNLOAD:
+                state = State.PROMPT_DOWNLOAD;
+                showDownloadPrompt();
+                break;
+            case FAILED:
+                state = State.FAILED;
+                showFailed(getString(outcome.retry == Retry.LOOKUP
+                        ? R.string.transcript_lookup_failed_title : R.string.transcript_failed_title),
+                        outcome.message, outcome.retry);
+                break;
+            case NONE:
+                state = State.NONE;
+                if (outcome.message != null) {
+                    showStatus(outcome.message, COLOR_TITLE_DIM, null, -2, 0, null, 0, null);
+                } else {
+                    renderCurrentState();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void enterProgress(String newJobId) {
+        jobId = newJobId;
+        state = State.PROGRESS;
+        pauseForWork();
+        showProgress(null);
+        startPolling();
+    }
+
+    private void showTranscript(DiarizedTranscript transcript) {
+        stopPolling();
+        state = State.TRANSCRIPT;
+        jobId = null;
+        statusOverlay.setVisibility(View.GONE);
+        adapter.setModel(new LiveTranscriptModel(transcript));
+        modelReady = true;
+        jumpPending = true;
+        lastTime = -1;
+        if (resumeAfter) {
+            resumeAfter = false;
+            setPlaying(true);
+        }
+    }
+
+    private void runWork(Callable<Outcome> callable) {
+        stopWork();
+        workDisposable = Single.fromCallable(callable)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::applyOutcome,
+                        error -> applyOutcome(Outcome.failed(describe(error), Retry.LOOKUP)));
+    }
+
+    private static String describe(Throwable error) {
+        return error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
+    }
+
+    private String hashOf(FeedMedia target, File file) throws IOException {
+        if (hashedMediaId == target.getId() && hashedValue != null) {
+            return hashedValue;
+        }
+        String value = TranscriptionClient.sha256Hex(file);
+        hashedMediaId = target.getId();
+        hashedValue = value;
+        return value;
+    }
+
+    @Nullable
+    private static File localFile(FeedMedia target) {
+        if (!target.isDownloaded() || target.getLocalFileUrl() == null) {
+            return null;
+        }
+        File file = new File(target.getLocalFileUrl());
+        return file.exists() ? file : null;
+    }
+
+    private void startLookup() {
+        if (isRunning(workDisposable)) {
+            return;
+        }
+        state = State.LOADING;
+        showLoading();
+        final FeedMedia target = media;
+        runWork(() -> lookup(target));
+    }
+
+    private Outcome lookup(FeedMedia target) {
+        GeneratedTranscript stored = DBReader.getGeneratedTranscript(target.getItemId());
+        if (stored != null && stored.getTranscript() != null) {
+            return Outcome.transcript(stored.getTranscript());
+        }
+        if (stored != null && stored.getJobId() != null
+                && GeneratedTranscript.STATUS_RUNNING.equals(stored.getStatus())) {
+            return Outcome.progress(stored.getJobId());
+        }
+        if (!UserPreferences.isTranscriptionConfigured()) {
+            return new Outcome(State.NONE, null, null, getString(R.string.transcript_not_configured), null);
+        }
+        File file = localFile(target);
+        if (file == null) {
+            return Outcome.of(State.PROMPT_DOWNLOAD);
+        }
+        try {
+            TranscriptionClient client = TranscriptionClient.fromPreferences();
+            Lookup found = client.lookupBySha256(hashOf(target, file));
+            if (found == null) {
+                return Outcome.of(State.PROMPT);
+            }
+            if (found.isDone()) {
+                return finish(target, client.getTranscriptResult(found.transcriptId));
+            }
+            DBWriter.setTranscriptionJob(target.getItemId(), found.jobId).get();
+            return Outcome.progress(found.jobId);
+        } catch (IOException | JSONException | InterruptedException | ExecutionException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+            return Outcome.failed(describe(e), Retry.LOOKUP);
+        }
+    }
+
+    private Outcome finish(FeedMedia target, String json) throws JSONException, InterruptedException,
+            ExecutionException {
+        DiarizedTranscript transcript = ServiceTranscriptParser.parse(json);
+        DBWriter.saveGeneratedTranscript(target.getItemId(), transcript).get();
+        return Outcome.transcript(transcript);
+    }
+
+    private void startSubmit() {
+        if (media == null || isRunning(workDisposable)) {
+            return;
+        }
+        stopPolling();
+        jobId = null;
+        state = State.PROGRESS;
+        pauseForWork();
+        showProgress(null);
+        final FeedMedia target = media;
+        runWork(() -> submit(target));
+    }
+
+    private Outcome submit(FeedMedia target) {
+        File file = localFile(target);
+        if (file == null) {
+            return Outcome.of(State.PROMPT_DOWNLOAD);
+        }
+        try {
+            FeedItem item = target.getItem();
+            TranscriptionClient client = TranscriptionClient.fromPreferences();
+            String context = target.getFeedTitle() + ", " + target.getEpisodeTitle();
+            SubmitResult result = client.submit(file, hashOf(target, file), TranscriptionClient.episodeKey(item),
+                    context);
+            if (result.isDone()) {
+                String json = result.transcriptId != null
+                        ? client.getTranscriptResult(result.transcriptId) : client.getJobResult(result.id);
+                return finish(target, json);
+            }
+            DBWriter.setTranscriptionJob(target.getItemId(), result.id).get();
+            return Outcome.progress(result.id);
+        } catch (IOException | JSONException | InterruptedException | ExecutionException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+            return Outcome.failed(describe(e), Retry.SUBMIT);
+        }
+    }
+
+    private void startPolling() {
+        if (isRunning(pollDisposable) || jobId == null || media == null) {
+            return;
+        }
+        final String id = jobId;
+        final FeedMedia target = media;
+        pollDisposable = Observable.interval(0, POLL_INTERVAL_SECONDS, TimeUnit.SECONDS, Schedulers.io())
+                .concatMapSingle(tick -> Single.fromCallable(() -> pollOnce(target, id)))
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(this::onPoll, error -> Log.e(TAG, Log.getStackTraceString(error)));
+    }
+
+    private PollResult pollOnce(FeedMedia target, String id) {
+        TranscriptionClient client = TranscriptionClient.fromPreferences();
+        try {
+            JobStatus status = client.getJob(id);
+            if (status.isDone()) {
+                Outcome outcome = finish(target, client.getJobResult(id));
+                try {
+                    client.deleteJob(id);
+                } catch (IOException ignored) {
+                    Log.d(TAG, "Could not delete finished job");
+                }
+                return new PollResult(PollKind.FINISHED, status, outcome);
+            } else if (status.isFailed()) {
+                String message = status.error != null ? status.error : status.message;
+                DBWriter.setTranscriptionError(target.getItemId(), message).get();
+                return new PollResult(PollKind.FINISHED, status, Outcome.failed(message, Retry.SUBMIT));
+            }
+            return new PollResult(PollKind.UPDATE, status, null);
+        } catch (TranscriptionException e) {
+            if (e.isNotFound()) {
+                return new PollResult(PollKind.LOST, null, null);
+            }
+            return new PollResult(PollKind.UNREACHABLE, null, null);
+        } catch (JSONException | InterruptedException | ExecutionException e) {
+            Log.e(TAG, Log.getStackTraceString(e));
+            return new PollResult(PollKind.FINISHED, null, Outcome.failed(describe(e), Retry.SUBMIT));
+        }
+    }
+
+    private void onPoll(PollResult result) {
+        if (state != State.PROGRESS) {
+            return;
+        }
+        switch (result.kind) {
+            case UPDATE:
+                showProgress(result.status);
+                break;
+            case UNREACHABLE:
+                statusDetail.setText(R.string.transcript_server_unreachable);
+                statusDetail.setVisibility(View.VISIBLE);
+                break;
+            case LOST:
+                stopPolling();
+                jobId = null;
+                final FeedMedia target = media;
+                state = State.LOADING;
+                stopWork();
+                workDisposable = Single.fromCallable(() -> {
+                    DBWriter.clearTranscriptionJob(target.getItemId()).get();
+                    return lookup(target);
+                })
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(this::applyOutcome,
+                                error -> applyOutcome(Outcome.failed(describe(error), Retry.LOOKUP)));
+                break;
+            default:
+                stopPolling();
+                applyOutcome(result.outcome);
+                break;
+        }
+    }
+
+    private void cancelJob() {
+        if (jobId == null || media == null) {
+            return;
+        }
+        final String id = jobId;
+        final FeedMedia target = media;
+        stopPolling();
+        stopWork();
+        workDisposable = Single.fromCallable(() -> {
+            try {
+                TranscriptionClient.fromPreferences().deleteJob(id);
+            } catch (TranscriptionException e) {
+                if (!e.isNotFound()) {
+                    return Outcome.progress(id);
+                }
+            }
+            DBWriter.clearTranscriptionJob(target.getItemId()).get();
+            return Outcome.of(State.PROMPT);
+        })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(outcome -> {
+                    jobId = null;
+                    if (outcome.state == State.PROMPT) {
+                        resumeAfter = false;
+                    }
+                    applyOutcome(outcome);
+                }, error -> applyOutcome(Outcome.progress(id)));
+    }
+
+    private void startDownload() {
+        if (media == null || media.getItem() == null) {
+            return;
+        }
+        state = State.DOWNLOADING;
+        downloadSeen = false;
+        pauseForWork();
+        showDownloading(-1);
+        DownloadServiceInterface.get().downloadNow(this, media.getItem(), true);
+        stopPolling();
+        pollDisposable = Observable.interval(1, 1, TimeUnit.SECONDS, AndroidSchedulers.mainThread())
+                .subscribe(tick -> checkDownload(), error -> Log.e(TAG, Log.getStackTraceString(error)));
+    }
+
+    private void checkDownload() {
+        if (state != State.DOWNLOADING || media == null || !started) {
+            return;
+        }
+        String url = media.getDownloadUrl();
+        if (DownloadServiceInterface.get().isDownloadingEpisode(url)) {
+            downloadSeen = true;
+            showDownloading(DownloadServiceInterface.get().getProgress(url));
+            return;
+        }
+        final long mediaId = media.getId();
+        if (downloadSeen || media.isDownloaded()) {
+            downloadSeen = false;
+            runDownloadFinished(mediaId);
+            return;
+        }
+        if (isRunning(workDisposable)) {
+            return;
+        }
+        workDisposable = Maybe.fromCallable(() -> DBReader.getFeedMedia(mediaId))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(fresh -> {
+                    workDisposable = null;
+                    if (state == State.DOWNLOADING && media != null && media.getId() == fresh.getId()
+                            && fresh.isDownloaded()) {
+                        downloadSeen = false;
+                        runDownloadFinished(mediaId);
+                    }
+                }, error -> {
+                    workDisposable = null;
+                    Log.e(TAG, Log.getStackTraceString(error));
+                }, () -> workDisposable = null);
+    }
+
+    private void runDownloadFinished(long mediaId) {
+        stopWork();
+        workDisposable = Maybe.fromCallable(() -> DBReader.getFeedMedia(mediaId))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(fresh -> {
+                    if (media == null || media.getId() != fresh.getId()) {
+                        return;
+                    }
+                    media = fresh;
+                    if (localFile(fresh) != null) {
+                        workDisposable = null;
+                        startSubmit();
+                    } else {
+                        state = State.FAILED;
+                        showFailed(getString(R.string.transcript_failed_title),
+                                getString(R.string.transcript_download_failed), Retry.DOWNLOAD);
+                    }
+                }, error -> Log.e(TAG, Log.getStackTraceString(error)));
     }
 }

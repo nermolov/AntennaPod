@@ -8,17 +8,24 @@
     android:paddingHorizontal="48dp"
     android:paddingVertical="27dp">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/transcriptList"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="7"
-        android:clipToPadding="false"
-        android:focusable="false"
-        android:overScrollMode="never"
-        android:requiresFadingEdge="vertical"
-        android:fadingEdgeLength="48dp"
-        android:scrollbars="none" />
+        android:layout_weight="7">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/transcriptList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:focusable="false"
+            android:overScrollMode="never"
+            android:requiresFadingEdge="vertical"
+            android:fadingEdgeLength="48dp"
+            android:scrollbars="none" />
+
+        <include layout="@layout/fullscreen_transcript_status" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

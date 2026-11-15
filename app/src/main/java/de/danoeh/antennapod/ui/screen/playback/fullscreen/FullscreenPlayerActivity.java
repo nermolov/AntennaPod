@@ -92,6 +92,7 @@ import java.util.concurrent.TimeUnit;
 public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final String TAG = "FullscreenPlayer";
     private static final long SEEK_THROTTLE_MS = 300;
+    private static final long TRANSCRIPT_LEAD_MS = 450;
     private static final long POLL_INTERVAL_SECONDS = 3;
     private static final int PROGRESS_MAX = 1000;
     private static final int DESIGN_WIDTH_DP = 1280;
@@ -550,7 +551,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         lastTime = time;
         final int previousCount = adapter.getItemCount();
-        adapter.setTime(time);
+        adapter.setTime(time + TRANSCRIPT_LEAD_MS);
         updateProgress(time);
         int count = adapter.getItemCount();
         if (count == 0) {

@@ -6,7 +6,6 @@
     <color name="fullscreen_player_progress_remaining">#A6787878</color>
 
     <dimen name="fullscreen_transcript_text_size">36sp</dimen>
-    <dimen name="fullscreen_transcript_edge_gap">20dp</dimen>
     <dimen name="fullscreen_cover_corner_radius">14dp</dimen>
 
     <style name="FullscreenPlayerText">

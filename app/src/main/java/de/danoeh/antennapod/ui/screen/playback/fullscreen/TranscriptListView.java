@@ -15,7 +15,7 @@ public class TranscriptListView extends RecyclerView {
         super(context, attrs);
     }
 
-    public int getSlideOffset() {
+    private int getSlideOffset() {
         int count = getAdapter() == null ? 0 : getAdapter().getItemCount();
         for (int i = getChildCount() - 1; i >= 0; i--) {
             View child = getChildAt(i);

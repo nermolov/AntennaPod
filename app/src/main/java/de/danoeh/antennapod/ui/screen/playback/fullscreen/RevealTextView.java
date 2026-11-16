@@ -116,6 +116,21 @@ public class RevealTextView extends View {
         invalidate();
     }
 
+    public void setRevealTimeInstant(long timeMs) {
+        revealTime = timeMs;
+        if (layout == null) {
+            return;
+        }
+        if (slideAnimator != null) {
+            slideAnimator.cancel();
+        }
+        revealedLines = revealedLineCount(lineStartTimes, timeMs);
+        shownLines = revealedLines;
+        slideProgress = 1f;
+        requestLayout();
+        invalidate();
+    }
+
     private void startSlide() {
         if (slideAnimator != null) {
             slideAnimator.cancel();

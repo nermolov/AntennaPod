@@ -28,6 +28,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
     private long currentTime = 0;
     private int trackedIndex = -1;
     private int trackedWords = -1;
+    private boolean instantReveal = false;
 
     public TranscriptRowAdapter() {
         setHasStableIds(true);
@@ -56,7 +57,25 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         trackedWords = -1;
     }
 
+    public int visibleCountAt(long timeMs) {
+        return model == null ? 0 : model.visibleTurnCountAt(timeMs);
+    }
+
+    public void jumpTo(long timeMs) {
+        currentTime = timeMs;
+        if (model == null) {
+            return;
+        }
+        instantReveal = true;
+        visibleCount = model.visibleTurnCountAt(timeMs);
+        int last = visibleCount - 1;
+        trackedIndex = last;
+        trackedWords = last >= 0 ? model.spokenWordCountAt(last, timeMs) : -1;
+        notifyDataSetChanged();
+    }
+
     public boolean setTime(long timeMs) {
+        instantReveal = false;
         currentTime = timeMs;
         if (model == null) {
             return false;
@@ -139,7 +158,12 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
 
     private void applyReveal(ViewHolder holder, int position) {
         boolean current = position == visibleCount - 1;
-        holder.text.setRevealTime(current ? currentTime : Long.MAX_VALUE);
+        long time = current ? currentTime : Long.MAX_VALUE;
+        if (instantReveal) {
+            holder.text.setRevealTimeInstant(time);
+        } else {
+            holder.text.setRevealTime(time);
+        }
     }
 
     @Override

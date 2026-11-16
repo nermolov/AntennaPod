@@ -3,7 +3,8 @@
 > [!WARNING]  
 > This is vibecode. No warranty is provided.
 
-A TV-focused fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod).
+A TV-focused fork of [AntennaPod](https://github.com/AntennaPod/AntennaPod) with live transcript rendering. See
+companion [transcription server](https://github.com/nermolov/podcast-transcription).
 
 ## License
 

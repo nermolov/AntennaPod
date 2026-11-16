@@ -55,6 +55,7 @@ import de.danoeh.antennapod.model.playback.Playable;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.net.transcription.JobStatus;
 import de.danoeh.antennapod.net.transcription.Lookup;
+import de.danoeh.antennapod.net.transcription.Partial;
 import de.danoeh.antennapod.net.transcription.SubmitResult;
 import de.danoeh.antennapod.net.transcription.TranscriptionClient;
 import de.danoeh.antennapod.net.transcription.TranscriptionException;
@@ -145,20 +146,43 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
 
     private enum PollKind { UPDATE, UNREACHABLE, FINISHED, LOST }
 
+    private static class Batch {
+        final int from;
+        final int nextSince;
+        final List<DiarizedTranscript.Turn> turns;
+        final long readyUntilMs;
+        final boolean complete;
+
+        Batch(int from, Partial partial, List<DiarizedTranscript.Turn> turns) {
+            this.from = from;
+            this.nextSince = partial.turnCount;
+            this.turns = turns;
+            this.readyUntilMs = partial.readyUntilMs;
+            this.complete = partial.complete;
+        }
+    }
+
     private static class PollResult {
         final PollKind kind;
         final JobStatus status;
         final Outcome outcome;
+        final Batch batch;
 
         PollResult(PollKind kind, JobStatus status, Outcome outcome) {
+            this(kind, status, outcome, null);
+        }
+
+        PollResult(PollKind kind, JobStatus status, Outcome outcome, Batch batch) {
             this.kind = kind;
             this.status = status;
             this.outcome = outcome;
+            this.batch = batch;
         }
     }
 
     private final PlaybackClock clock = new PlaybackClock();
     private final TranscriptRowAdapter adapter = new TranscriptRowAdapter();
+    private final TranscriptPlaybackGate gate = new TranscriptPlaybackGate(TRANSCRIPT_LEAD_MS);
     private final Choreographer.FrameCallback frameCallback = frameTimeNanos -> onFrame();
 
     private TranscriptListView transcriptList;
@@ -184,6 +208,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private State state = State.LOADING;
     private Retry retry = Retry.LOOKUP;
     private String jobId;
+    private LiveTranscriptModel liveModel;
+    private ServiceTranscriptParser.Accumulator accumulator = new ServiceTranscriptParser.Accumulator();
+    private volatile int turnsSince = 0;
+    private JobStatus lastStatus;
     private boolean resumeAfter = false;
     private boolean downloadSeen = false;
     private long hashedMediaId = -1;
@@ -474,7 +502,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         clock.setPlaying(isPlaybackActive(), now);
         if (!sameMedia || !modelReady) {
             clock.update(media.getPosition(), now);
-            adapter.setModel(new LiveTranscriptModel(new DiarizedTranscript(Collections.emptyList())));
+            liveModel = new LiveTranscriptModel(new DiarizedTranscript(Collections.emptyList()));
+            adapter.setModel(liveModel);
             modelReady = true;
             jumpPending = true;
             lastTime = -1;
@@ -595,6 +624,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         alignToEnd();
         long now = SystemClock.elapsedRealtime();
         long time = clock.positionAt(now);
+        if (state == State.PROGRESS) {
+            updateGate(time);
+        }
         boolean jump = jumpPending;
         if (time == lastTime && !jump) {
             return;
@@ -607,9 +639,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (count == 0) {
             return;
         }
-        if (jump) {
+        if (jump || count - previousCount > 1) {
             jumpPending = false;
             alignPending = true;
+            smoothScrollPending = true;
             transcriptList.stopScroll();
             layoutManager.scrollToPositionWithOffset(count - 1, 0);
         } else if (count != previousCount) {
@@ -664,7 +697,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private boolean isPlaybackBlocked() {
-        return state == State.PROGRESS || state == State.DOWNLOADING;
+        return (state == State.PROGRESS && gate.isBlocked()) || state == State.DOWNLOADING;
     }
 
     @Override
@@ -805,7 +838,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 break;
             case PROGRESS:
                 if (jobId != null) {
-                    showProgress(null);
+                    if (gate.isBlocked()) {
+                        showProgress(lastStatus);
+                    }
                     startPolling();
                 } else {
                     startSubmit();
@@ -908,11 +943,17 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private void showProgress(@Nullable JobStatus status) {
+        boolean catchingUp = liveModel != null && liveModel.getTurnCount() > 0;
+        String title = getString(catchingUp
+                ? R.string.transcript_catching_up_title : R.string.transcript_progress_title);
         if (status == null) {
-            showStatus(getString(R.string.transcript_progress_title), COLOR_TITLE, null, -1, 0, null, 0, null);
+            showStatus(title, COLOR_TITLE, null, -1, 0, null, 0, null);
             return;
         }
         String stage = getString(TranscriptionProgressFormatter.stageLabel(status.status, status.stage));
+        if (catchingUp && liveModel.getReadyUntilMs() > 0) {
+            stage = getString(R.string.transcript_ready_until, formatClock((int) liveModel.getReadyUntilMs()));
+        }
         int percent = TranscriptionProgressFormatter.percent(status.overallProgress);
         boolean queued = TranscriptionProgressFormatter.isQueued(status.status);
         String detail = stage;
@@ -923,7 +964,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             detail = getString(R.string.transcript_detail_format, stage,
                     getString(R.string.percentage_format, percent));
         }
-        showStatus(getString(R.string.transcript_progress_title), COLOR_TITLE, detail, queued ? -1 : percent,
+        showStatus(title, COLOR_TITLE, detail, queued ? -1 : percent,
                 queued ? R.string.transcript_cancel_label : 0, queued ? this::cancelJob : null, 0, null);
     }
 
@@ -1008,11 +1049,68 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     }
 
     private void enterProgress(String newJobId) {
+        stopPolling();
         jobId = newJobId;
         state = State.PROGRESS;
+        turnsSince = 0;
+        accumulator = new ServiceTranscriptParser.Accumulator();
+        gate.reset();
+        lastStatus = null;
+        liveModel = new LiveTranscriptModel(new DiarizedTranscript(Collections.emptyList()));
+        adapter.setModel(liveModel);
+        modelReady = true;
+        jumpPending = true;
+        lastTime = -1;
         pauseForWork();
         showProgress(null);
         startPolling();
+    }
+
+    private void updateGate(long position) {
+        if (liveModel == null) {
+            return;
+        }
+        boolean wasBlocked = gate.isBlocked();
+        boolean blocked = gate.update(position, liveModel.getReadyUntilMs(), liveModel.isComplete());
+        if (blocked == wasBlocked) {
+            return;
+        }
+        if (blocked) {
+            resumeAfter = resumeAfter || clock.isPlaying() || isPlaybackActive();
+            setPlaying(false);
+            showProgress(lastStatus);
+        } else {
+            statusOverlay.setVisibility(View.GONE);
+            if (resumeAfter) {
+                resumeAfter = false;
+                setPlaying(true);
+            }
+        }
+    }
+
+    private void applyBatch(@Nullable Batch batch) {
+        if (batch == null || liveModel == null || batch.from != turnsSince) {
+            return;
+        }
+        turnsSince = batch.nextSince;
+        liveModel.appendTurns(batch.turns);
+        liveModel.setReadyUntilMs(batch.readyUntilMs);
+        liveModel.setComplete(batch.complete);
+        adapter.onModelGrown();
+        lastTime = -1;
+    }
+
+    private void finishStreaming() {
+        stopPolling();
+        state = State.TRANSCRIPT;
+        jobId = null;
+        lastStatus = null;
+        statusOverlay.setVisibility(View.GONE);
+        gate.update(0, 0, true);
+        if (resumeAfter) {
+            resumeAfter = false;
+            setPlaying(true);
+        }
     }
 
     private void showTranscript(DiarizedTranscript transcript) {
@@ -1020,7 +1118,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         state = State.TRANSCRIPT;
         jobId = null;
         statusOverlay.setVisibility(View.GONE);
-        adapter.setModel(new LiveTranscriptModel(transcript));
+        liveModel = new LiveTranscriptModel(transcript);
+        adapter.setModel(liveModel);
         modelReady = true;
         jumpPending = true;
         lastTime = -1;
@@ -1171,6 +1270,17 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         TranscriptionClient client = TranscriptionClient.fromPreferences();
         try {
             JobStatus status = client.getJob(id);
+            if (status.isFailed()) {
+                String message = status.error != null ? status.error : status.message;
+                DBWriter.setTranscriptionError(target.getItemId(), message).get();
+                return new PollResult(PollKind.FINISHED, status, Outcome.failed(message, Retry.SUBMIT));
+            }
+            Batch batch = null;
+            if (!TranscriptionProgressFormatter.isQueued(status.status)) {
+                int from = turnsSince;
+                Partial partial = client.getPartial(id, from);
+                batch = new Batch(from, partial, accumulator.add(partial.turnsJson));
+            }
             if (status.isDone()) {
                 Outcome outcome = finish(target, client.getJobResult(id));
                 try {
@@ -1178,13 +1288,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 } catch (IOException ignored) {
                     Log.d(TAG, "Could not delete finished job");
                 }
-                return new PollResult(PollKind.FINISHED, status, outcome);
-            } else if (status.isFailed()) {
-                String message = status.error != null ? status.error : status.message;
-                DBWriter.setTranscriptionError(target.getItemId(), message).get();
-                return new PollResult(PollKind.FINISHED, status, Outcome.failed(message, Retry.SUBMIT));
+                return new PollResult(PollKind.FINISHED, status, outcome, batch);
             }
-            return new PollResult(PollKind.UPDATE, status, null);
+            return new PollResult(PollKind.UPDATE, status, null, batch);
         } catch (TranscriptionException e) {
             if (e.isNotFound()) {
                 return new PollResult(PollKind.LOST, null, null);
@@ -1202,11 +1308,18 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         switch (result.kind) {
             case UPDATE:
-                showProgress(result.status);
+                lastStatus = result.status;
+                applyBatch(result.batch);
+                updateGate(clock.positionAt(SystemClock.elapsedRealtime()));
+                if (gate.isBlocked()) {
+                    showProgress(result.status);
+                }
                 break;
             case UNREACHABLE:
-                statusDetail.setText(R.string.transcript_server_unreachable);
-                statusDetail.setVisibility(View.VISIBLE);
+                if (gate.isBlocked()) {
+                    statusDetail.setText(R.string.transcript_server_unreachable);
+                    statusDetail.setVisibility(View.VISIBLE);
+                }
                 break;
             case LOST:
                 stopPolling();
@@ -1224,8 +1337,14 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                                 error -> applyOutcome(Outcome.failed(describe(error), Retry.LOOKUP)));
                 break;
             default:
-                stopPolling();
-                applyOutcome(result.outcome);
+                if (result.outcome.state == State.TRANSCRIPT && result.batch != null
+                        && result.batch.from == turnsSince && liveModel != null) {
+                    applyBatch(result.batch);
+                    finishStreaming();
+                } else {
+                    stopPolling();
+                    applyOutcome(result.outcome);
+                }
                 break;
         }
     }

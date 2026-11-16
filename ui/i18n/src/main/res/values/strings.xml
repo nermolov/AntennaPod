@@ -314,6 +314,8 @@
     <string name="transcript_downloading_title">Downloading episode…</string>
     <string name="transcript_download_failed">The episode could not be downloaded.</string>
     <string name="transcript_progress_title">Transcribing…</string>
+    <string name="transcript_catching_up_title">Catching up on the transcript…</string>
+    <string name="transcript_ready_until">Transcribed up to %1$s</string>
     <string name="transcript_stage_queued">Waiting in queue</string>
     <string name="transcript_stage_prepare">Preparing audio</string>
     <string name="transcript_stage_transcribe">Transcribing speech</string>

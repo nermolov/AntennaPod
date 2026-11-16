@@ -25,26 +25,33 @@ public final class ServiceTranscriptParser {
     }
 
     public static DiarizedTranscript parse(String json) throws JSONException {
-        JSONArray array = new JSONArray(json);
-        List<RawTurn> raw = new ArrayList<>();
-        for (int i = 0; i < array.length(); i++) {
-            RawTurn turn = parseTurn(array.getJSONObject(i));
-            if (turn != null) {
-                raw.add(turn);
+        return new DiarizedTranscript(new Accumulator().add(json));
+    }
+
+    public static class Accumulator {
+        private final Map<String, Integer> speakerIndices = new HashMap<>();
+
+        public List<DiarizedTranscript.Turn> add(String json) throws JSONException {
+            JSONArray array = new JSONArray(json);
+            List<RawTurn> raw = new ArrayList<>();
+            for (int i = 0; i < array.length(); i++) {
+                RawTurn turn = parseTurn(array.getJSONObject(i));
+                if (turn != null) {
+                    raw.add(turn);
+                }
             }
-        }
-        Collections.sort(raw, (a, b) -> Long.compare(a.start, b.start));
-        Map<String, Integer> speakerIndices = new HashMap<>();
-        List<DiarizedTranscript.Turn> turns = new ArrayList<>();
-        for (RawTurn turn : raw) {
-            Integer index = speakerIndices.get(turn.speaker);
-            if (index == null) {
-                index = speakerIndices.size();
-                speakerIndices.put(turn.speaker, index);
+            Collections.sort(raw, (a, b) -> Long.compare(a.start, b.start));
+            List<DiarizedTranscript.Turn> turns = new ArrayList<>();
+            for (RawTurn turn : raw) {
+                Integer index = speakerIndices.get(turn.speaker);
+                if (index == null) {
+                    index = speakerIndices.size();
+                    speakerIndices.put(turn.speaker, index);
+                }
+                turns.add(new DiarizedTranscript.Turn(turn.speaker, index, turn.words, turn.starts, turn.ends));
             }
-            turns.add(new DiarizedTranscript.Turn(turn.speaker, index, turn.words, turn.starts, turn.ends));
+            return turns;
         }
-        return new DiarizedTranscript(turns);
     }
 
     private static RawTurn parseTurn(JSONObject obj) {

@@ -9,6 +9,7 @@ import org.robolectric.RobolectricTestRunner;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -95,5 +96,26 @@ public class ServiceTranscriptParserTest {
             assertArrayEquals(a.getStartMs(), b.getStartMs());
             assertArrayEquals(a.getEndMs(), b.getEndMs());
         }
+    }
+
+    @Test
+    public void testAccumulatorKeepsSpeakerIndicesAcrossBatches() throws Exception {
+        ServiceTranscriptParser.Accumulator accumulator = new ServiceTranscriptParser.Accumulator();
+        List<DiarizedTranscript.Turn> first = accumulator.add(
+                "[{\"speaker\":\"A\",\"start\":0,\"end\":1,\"text\":\"hello there\"},"
+                + "{\"speaker\":\"B\",\"start\":1,\"end\":2,\"text\":\"hi\"}]");
+        List<DiarizedTranscript.Turn> second = accumulator.add(
+                "[{\"speaker\":\"C\",\"start\":3,\"end\":4,\"text\":\"new\"},"
+                + "{\"speaker\":\"B\",\"start\":2,\"end\":3,\"text\":\"again\"}]");
+        assertEquals(2, first.size());
+        assertEquals(2, second.size());
+        assertEquals(1, second.get(0).getSpeakerIndex());
+        assertEquals(2, second.get(1).getSpeakerIndex());
+        assertEquals("C", second.get(1).getSpeaker());
+    }
+
+    @Test
+    public void testAccumulatorEmptyBatch() throws Exception {
+        assertTrue(new ServiceTranscriptParser.Accumulator().add("[]").isEmpty());
     }
 }

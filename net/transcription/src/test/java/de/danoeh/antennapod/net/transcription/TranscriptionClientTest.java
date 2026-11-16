@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,6 +32,7 @@ public class TranscriptionClientTest {
     private TranscriptionClient client;
     private final AtomicReference<String> lastAuth = new AtomicReference<>();
     private final AtomicReference<String> lastQuery = new AtomicReference<>();
+    private final AtomicReference<String> lastMethod = new AtomicReference<>();
     private final AtomicBoolean offline = new AtomicBoolean(false);
 
     @Before
@@ -49,10 +51,24 @@ public class TranscriptionClientTest {
                             "{\"status\":\"queued\",\"job_id\":\"j1\",\"transcript_id\":null}");
                 }
                 return response(request, 404, "{\"detail\":\"nothing\"}");
+            } else if (path.equals("/jobs") && request.method().equals("GET")) {
+                return response(request, 200, "[{\"id\":\"a\",\"status\":\"running\",\"sha256\":\"h\","
+                        + "\"key\":null,\"ready_s\":12.5},{\"id\":\"b\",\"status\":\"done\"},"
+                        + "{\"id\":\"c\",\"status\":\"queued\",\"sha256\":null,\"key\":\"k\"}]");
+            } else if (path.equals("/jobs") && request.method().equals("DELETE")) {
+                lastMethod.set("DELETE /jobs");
+                return response(request, 200, "{\"cancelled\":[]}");
+            } else if (path.equals("/jobs/j1/partial")) {
+                return response(request, 200, "{\"status\":\"running\",\"complete\":false,\"audio_s\":3600.0,"
+                        + "\"ready_until\":125.5,\"n_turns\":2,\"since\":1,\"turns\":[{\"speaker\":\"S0\"}]}");
+            } else if (path.equals("/jobs/gone/partial")) {
+                return response(request, 404, "{\"detail\":\"no such job\"}");
+            } else if (path.equals("/jobs/bad/partial")) {
+                return response(request, 409, "{\"detail\":\"job failed\"}");
             } else if (path.equals("/jobs/j1")) {
                 return response(request, 200, "{\"status\":\"running\",\"stage\":\"vibevoice\","
                         + "\"overall_progress\":0.5,\"queue_position\":null,\"message\":\"m\","
-                        + "\"transcript_id\":null}");
+                        + "\"transcript_id\":null,\"ready_s\":30.0,\"audio_s\":null}");
             }
             return response(request, 500, "oops");
         };
@@ -89,6 +105,56 @@ public class TranscriptionClientTest {
         assertEquals(0.5, status.overallProgress, 0.0001);
         assertNull(status.queuePosition);
         assertNull(status.error);
+        assertEquals(30.0, status.readyS, 0.0001);
+        assertNull(status.audioS);
+    }
+
+    @Test
+    public void testGetPartial() throws Exception {
+        Partial partial = client.getPartial("j1", 1);
+        assertEquals("since=1", lastQuery.get());
+        assertEquals("running", partial.status);
+        assertFalse(partial.complete);
+        assertEquals(3600.0, partial.audioS, 0.0001);
+        assertEquals(125500, partial.readyUntilMs);
+        assertEquals(2, partial.turnCount);
+        assertTrue(partial.turnsJson.contains("S0"));
+    }
+
+    @Test
+    public void testGetPartialErrors() {
+        try {
+            client.getPartial("gone", 0);
+            fail();
+        } catch (TranscriptionException e) {
+            assertTrue(e.isNotFound());
+        }
+        try {
+            client.getPartial("bad", 0);
+            fail();
+        } catch (TranscriptionException e) {
+            assertEquals(409, e.getHttpCode());
+        }
+    }
+
+    @Test
+    public void testListActiveJobsKeepsQueuedAndRunning() throws Exception {
+        List<ActiveJob> jobs = client.listActiveJobs();
+        assertEquals(2, jobs.size());
+        assertEquals("a", jobs.get(0).id);
+        assertTrue(jobs.get(0).isRunning());
+        assertEquals("h", jobs.get(0).sha256);
+        assertNull(jobs.get(0).key);
+        assertEquals(12.5, jobs.get(0).readyS, 0.0001);
+        assertEquals("c", jobs.get(1).id);
+        assertEquals("k", jobs.get(1).key);
+        assertNull(jobs.get(1).readyS);
+    }
+
+    @Test
+    public void testCancelAll() throws Exception {
+        client.cancelAll();
+        assertEquals("DELETE /jobs", lastMethod.get());
     }
 
     @Test

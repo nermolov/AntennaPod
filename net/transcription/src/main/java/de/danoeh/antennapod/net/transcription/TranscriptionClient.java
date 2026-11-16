@@ -12,6 +12,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -22,6 +23,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class TranscriptionClient {
@@ -147,10 +150,50 @@ public class TranscriptionClient {
             Double progress = json.isNull("overall_progress") ? null : json.optDouble("overall_progress");
             Integer queuePosition = json.isNull("queue_position") ? null : json.optInt("queue_position");
             return new JobStatus(json.optString("status", ""), optString(json, "stage"), progress, queuePosition,
-                    optString(json, "message"), optString(json, "error"), optString(json, "transcript_id"));
+                    optString(json, "message"), optString(json, "error"), optString(json, "transcript_id"),
+                    optDouble(json, "ready_s"), optDouble(json, "audio_s"));
         } catch (JSONException e) {
             throw new TranscriptionException("Invalid response", e);
         }
+    }
+
+    public Partial getPartial(String id, int since) throws TranscriptionException {
+        HttpUrl url = baseHttpUrl().newBuilder().addPathSegment("jobs").addPathSegment(id)
+                .addPathSegment("partial").addQueryParameter("since", String.valueOf(Math.max(0, since))).build();
+        try {
+            JSONObject json = new JSONObject(execute(request(url).get().build()));
+            JSONArray turns = json.optJSONArray("turns");
+            long readyUntilMs = Math.round(json.optDouble("ready_until", 0.0) * 1000.0);
+            return new Partial(json.optString("status", ""), json.optBoolean("complete", false),
+                    optDouble(json, "audio_s"), readyUntilMs, json.optInt("n_turns", 0),
+                    turns == null ? "[]" : turns.toString());
+        } catch (JSONException e) {
+            throw new TranscriptionException("Invalid response", e);
+        }
+    }
+
+    public List<ActiveJob> listActiveJobs() throws TranscriptionException {
+        HttpUrl url = baseHttpUrl().newBuilder().addPathSegment("jobs").build();
+        try {
+            JSONArray array = new JSONArray(execute(request(url).get().build()));
+            List<ActiveJob> jobs = new ArrayList<>();
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject json = array.getJSONObject(i);
+                String status = json.optString("status", "");
+                if ("queued".equals(status) || "running".equals(status)) {
+                    jobs.add(new ActiveJob(json.getString("id"), status, optString(json, "sha256"),
+                            optString(json, "key"), optDouble(json, "ready_s")));
+                }
+            }
+            return jobs;
+        } catch (JSONException e) {
+            throw new TranscriptionException("Invalid response", e);
+        }
+    }
+
+    public void cancelAll() throws TranscriptionException {
+        HttpUrl url = baseHttpUrl().newBuilder().addPathSegment("jobs").build();
+        execute(request(url).delete().build());
     }
 
     public String getJobResult(String id) throws TranscriptionException {
@@ -168,6 +211,15 @@ public class TranscriptionClient {
     public void deleteJob(String id) throws TranscriptionException {
         HttpUrl url = baseHttpUrl().newBuilder().addPathSegment("jobs").addPathSegment(id).build();
         execute(request(url).delete().build());
+    }
+
+    @Nullable
+    private static Double optDouble(JSONObject json, String name) {
+        if (json.isNull(name) || !json.has(name)) {
+            return null;
+        }
+        double value = json.optDouble(name, Double.NaN);
+        return Double.isNaN(value) ? null : value;
     }
 
     @Nullable

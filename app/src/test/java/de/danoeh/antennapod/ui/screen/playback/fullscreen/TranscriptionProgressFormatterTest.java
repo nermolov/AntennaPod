@@ -34,11 +34,4 @@ public class TranscriptionProgressFormatterTest {
         assertEquals(42, TranscriptionProgressFormatter.percent(0.424));
         assertEquals(100, TranscriptionProgressFormatter.percent(3.0));
     }
-
-    @Test
-    public void estimatesMinutes() {
-        assertEquals(1, TranscriptionProgressFormatter.estimateMinutes(0));
-        assertEquals(1, TranscriptionProgressFormatter.estimateMinutes(60_000));
-        assertEquals(18, TranscriptionProgressFormatter.estimateMinutes(60 * 60_000));
-    }
 }

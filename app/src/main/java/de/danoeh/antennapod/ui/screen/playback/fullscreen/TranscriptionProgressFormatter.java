@@ -7,7 +7,6 @@ import de.danoeh.antennapod.R;
 import java.util.Locale;
 
 public final class TranscriptionProgressFormatter {
-    private static final double ESTIMATE_FACTOR = 0.3;
     private static final String STATUS_QUEUED = "queued";
 
     private TranscriptionProgressFormatter() {
@@ -45,12 +44,5 @@ public final class TranscriptionProgressFormatter {
             return -1;
         }
         return (int) Math.round(Math.max(0.0, Math.min(1.0, overallProgress)) * 100);
-    }
-
-    public static int estimateMinutes(long durationMs) {
-        if (durationMs <= 0) {
-            return 1;
-        }
-        return (int) Math.max(1, Math.round(durationMs * ESTIMATE_FACTOR / 60000.0));
     }
 }

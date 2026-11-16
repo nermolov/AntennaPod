@@ -138,8 +138,6 @@
     <string name="no_chapters_label">No chapters</string>
     <string name="chapter_duration">Duration: %1$s</string>
     <string name="description_label">Description</string>
-    <string name="shownotes_label">Shownotes</string>
-    <string name="shownotes_contentdescription">swipe up to read shownotes</string>
     <string name="close_label">Close</string>
     <string name="retry_label">Retry</string>
     <string name="auto_download_label">Download automatically</string>
@@ -855,9 +853,7 @@
     <string name="is_played">Played</string>
     <string name="load_next_page_label">Load next page</string>
     <string name="position">Position: %1$s</string>
-    <string name="remaining_time">Remaining time: %1$s</string>
     <string name="play_chapter">Play chapter</string>
-    <string name="prev_chapter">Previous chapter</string>
     <string name="next_chapter">Next chapter</string>
     <string name="shuffle_suggestions">Shuffle suggestions</string>
     <string name="add_preset">Add preset</string>

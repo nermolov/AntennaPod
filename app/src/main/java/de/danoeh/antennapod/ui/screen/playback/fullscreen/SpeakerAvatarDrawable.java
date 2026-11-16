@@ -24,8 +24,8 @@ public class SpeakerAvatarDrawable extends Drawable {
     private final ShadowedRoundRectDrawable circle;
     private final int index;
 
-    public SpeakerAvatarDrawable(int speakerIndex, Typeface typeface, float density) {
-        index = Math.floorMod(speakerIndex, GLYPHS.length);
+    public SpeakerAvatarDrawable(int avatarIndex, Typeface typeface, float density) {
+        index = Math.floorMod(avatarIndex, GLYPHS.length);
         float diameter = DESIGN_DIAMETER * density;
         circle = new ShadowedRoundRectDrawable(COLORS[index], diameter / 2f, density, 4f * density, 3f * density,
                 SHADOW_COLOR);
@@ -34,8 +34,8 @@ public class SpeakerAvatarDrawable extends Drawable {
         textPaint.setTextAlign(Paint.Align.CENTER);
     }
 
-    public static int colorFor(int speakerIndex) {
-        return COLORS[Math.floorMod(speakerIndex, COLORS.length)];
+    public static int colorFor(int avatarIndex) {
+        return COLORS[Math.floorMod(avatarIndex, COLORS.length)];
     }
 
     public static int variantCount() {

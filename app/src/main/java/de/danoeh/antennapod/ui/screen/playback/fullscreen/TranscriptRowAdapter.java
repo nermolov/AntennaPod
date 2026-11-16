@@ -21,6 +21,7 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
     private static final int BUBBLE_SHADOW_COLOR = 0x401D1818;
 
     private LiveTranscriptModel model;
+    private SpeakerAvatarAssignment assignment = new SpeakerAvatarAssignment("");
     private Typeface avatarTypeface;
     private Typeface textTypeface;
     private int visibleCount = 0;
@@ -39,6 +40,16 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         trackedWords = -1;
         currentTime = 0;
         notifyDataSetChanged();
+    }
+
+    public void setAssignment(SpeakerAvatarAssignment newAssignment) {
+        if (assignment.getKey().equals(newAssignment.getKey())) {
+            return;
+        }
+        assignment = newAssignment;
+        if (visibleCount > 0) {
+            notifyDataSetChanged();
+        }
     }
 
     public void onModelGrown() {
@@ -102,10 +113,11 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         Context context = holder.itemView.getContext();
         float density = context.getResources().getDisplayMetrics().density;
         int speaker = turn.getSpeakerIndex();
-        holder.avatar.setImageDrawable(new SpeakerAvatarDrawable(speaker, avatarTypeface, density));
+        int avatar = assignment.avatarFor(speaker);
+        holder.avatar.setImageDrawable(new SpeakerAvatarDrawable(avatar, avatarTypeface, density));
         holder.avatar.setContentDescription(context.getString(R.string.transcript_speaker_number, speaker + 1));
         holder.text.setBubble(new ShadowedRoundRectDrawable(
-                PlayerColorScheme.bubble(SpeakerAvatarDrawable.colorFor(speaker)),
+                PlayerColorScheme.bubble(SpeakerAvatarDrawable.colorFor(avatar)),
                 BUBBLE_CORNER_DP * density, density, BUBBLE_SHADOW_DY_DP * density,
                 BUBBLE_SHADOW_BLUR_DP * density, BUBBLE_SHADOW_COLOR));
         holder.text.setTypeface(textTypeface);

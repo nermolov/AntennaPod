@@ -11,6 +11,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Choreographer;
@@ -460,6 +461,17 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                         this::finish);
     }
 
+    private static String avatarKeyFor(FeedMedia feedMedia) {
+        FeedItem item = feedMedia.getItem();
+        if (item != null && !TextUtils.isEmpty(item.getItemIdentifier())) {
+            return item.getItemIdentifier();
+        }
+        if (!TextUtils.isEmpty(feedMedia.getDownloadUrl())) {
+            return feedMedia.getDownloadUrl();
+        }
+        return String.valueOf(feedMedia.getId());
+    }
+
     private void onLoaded(FeedMedia loaded) {
         final boolean sameMedia = media != null && media.getId() == loaded.getId();
         if (!sameMedia) {
@@ -471,6 +483,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             downloadSeen = false;
         }
         media = loaded;
+        adapter.setAssignment(new SpeakerAvatarAssignment(avatarKeyFor(media)));
         episodeTitle.setText(media.getEpisodeTitle());
         feedTitle.setText(media.getFeedTitle());
         loadCover();

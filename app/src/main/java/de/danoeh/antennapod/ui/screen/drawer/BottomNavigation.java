@@ -3,6 +3,7 @@ package de.danoeh.antennapod.ui.screen.drawer;
 import android.content.Context;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -37,6 +38,7 @@ public class BottomNavigation {
     private final Context context;
 
     private Disposable bottomNavigationBadgeLoader = null;
+    private NavPlayerStatusView playerStatusView;
 
     public BottomNavigation(NavigationRailView bottomNavigationView) {
         this.bottomNavigationView = bottomNavigationView;
@@ -156,10 +158,18 @@ public class BottomNavigation {
 
     public void onCreateView() {
         EventBus.getDefault().register(this);
+        View playerStatus = LayoutInflater.from(context)
+                .inflate(R.layout.nav_rail_player_status, bottomNavigationView, false);
+        bottomNavigationView.addHeaderView(playerStatus);
+        playerStatusView = new NavPlayerStatusView(playerStatus);
+        playerStatusView.start();
     }
 
     public void onDestroyView() {
         EventBus.getDefault().unregister(this);
+        if (playerStatusView != null) {
+            playerStatusView.stop();
+        }
         if (bottomNavigationBadgeLoader != null) {
             bottomNavigationBadgeLoader.dispose();
             bottomNavigationBadgeLoader = null;

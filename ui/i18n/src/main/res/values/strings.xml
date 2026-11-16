@@ -251,6 +251,7 @@
     </plurals>
     <string name="play_label">Play</string>
     <string name="pause_label">Pause</string>
+    <string name="now_playing_content_description">Now playing: %1$s</string>
     <string name="stream_label">Stream</string>
     <string name="delete_label">Delete</string>
     <plurals name="deleted_episode_message">

@@ -87,6 +87,7 @@ public class NavDrawerFragment extends Fragment implements SharedPreferences.OnS
     private NavListAdapter navAdapter;
     private Disposable disposable;
     private ProgressBar progressBar;
+    private NavPlayerStatusView playerStatusView;
     private Set<String> openFolders = new HashSet<>();
 
     @Override
@@ -119,6 +120,8 @@ public class NavDrawerFragment extends Fragment implements SharedPreferences.OnS
         navList.setAdapter(navAdapter);
         navList.setLayoutManager(new LinearLayoutManager(getContext()));
 
+        playerStatusView = new NavPlayerStatusView(root.findViewById(R.id.nav_player_status));
+
         root.findViewById(R.id.nav_settings).setOnClickListener(v ->
                 startActivity(new Intent(getActivity(), PreferenceActivity.class)));
 
@@ -147,12 +150,14 @@ public class NavDrawerFragment extends Fragment implements SharedPreferences.OnS
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         EventBus.getDefault().register(this);
+        playerStatusView.start();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         EventBus.getDefault().unregister(this);
+        playerStatusView.stop();
         if (disposable != null) {
             disposable.dispose();
         }

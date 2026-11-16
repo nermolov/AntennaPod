@@ -24,6 +24,7 @@ import java.util.Arrays;
 public class RevealTextView extends View {
     private static final float LINE_SPACING_MULTIPLIER = 1.2f;
     public static final long SLIDE_DURATION_MS = 350;
+    static final long UNSPOKEN_LEAD_MS = 300;
     private final TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
     private LiveTranscriptModel.Turn turn;
     private long revealTime = Long.MAX_VALUE;
@@ -135,11 +136,15 @@ public class RevealTextView extends View {
         invalidate();
     }
 
+    private long dimTime() {
+        return revealTime > Long.MAX_VALUE - UNSPOKEN_LEAD_MS ? Long.MAX_VALUE : revealTime + UNSPOKEN_LEAD_MS;
+    }
+
     private void applyUnspoken() {
         if (turn == null || text == null) {
             return;
         }
-        int start = unspokenStartOffset(turn.getWordStartTimes(), turn.getWordCharOffsets(), revealTime,
+        int start = unspokenStartOffset(turn.getWordStartTimes(), turn.getWordCharOffsets(), dimTime(),
                 text.length());
         if (start == unspokenStart) {
             return;

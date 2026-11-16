@@ -239,7 +239,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private long lastTime = -1;
     private long lastDisplayedSecond = -1;
     private long lastDisplayedDuration = -1;
-    private int reservedTimeDigitGroups = -1;
+    private int reservedElapsedDigitGroups = -1;
+    private int reservedDurationDigitGroups = -1;
     private long lastSeekKeyTime = 0;
 
     @Override
@@ -312,7 +313,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         progress = findViewById(R.id.progress);
         elapsedText = findViewById(R.id.elapsedText);
         durationText = findViewById(R.id.durationText);
-        reserveTimeLabelWidth(false);
+        reserveTimeLabelWidth(elapsedText, false);
+        reserveTimeLabelWidth(durationText, false);
         statusOverlay = findViewById(R.id.statusOverlay);
         statusTitle = findViewById(R.id.statusTitle);
         statusProgress = findViewById(R.id.statusProgress);
@@ -733,6 +735,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         long second = shownPosition / 1000;
         if (second != lastDisplayedSecond) {
             lastDisplayedSecond = second;
+            reserveTimeLabelWidth(elapsedText, shownPosition >= 3600 * 1000);
             elapsedText.setText(formatClock(shownPosition));
             if (duration > 0) {
                 progress.setProgress((int) (time * progress.getMax() / duration));
@@ -741,26 +744,29 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (duration != lastDisplayedDuration) {
             lastDisplayedDuration = duration;
             int scaledDuration = converter.convert((int) duration);
-            reserveTimeLabelWidth(scaledDuration >= 3600 * 1000);
+            reserveTimeLabelWidth(durationText, scaledDuration >= 3600 * 1000);
             durationText.setText(formatClock(scaledDuration));
         }
     }
 
-    private void reserveTimeLabelWidth(boolean withHours) {
+    private void reserveTimeLabelWidth(TextView label, boolean withHours) {
         int digitGroups = withHours ? 3 : 2;
-        if (digitGroups == reservedTimeDigitGroups) {
+        boolean isElapsed = label == elapsedText;
+        if (digitGroups == (isElapsed ? reservedElapsedDigitGroups : reservedDurationDigitGroups)) {
             return;
         }
-        reservedTimeDigitGroups = digitGroups;
-        TextPaint paint = elapsedText.getPaint();
+        if (isElapsed) {
+            reservedElapsedDigitGroups = digitGroups;
+        } else {
+            reservedDurationDigitGroups = digitGroups;
+        }
+        TextPaint paint = label.getPaint();
         float widestDigit = 0;
         for (int i = 0; i < 10; i++) {
             widestDigit = Math.max(widestDigit, paint.measureText(String.format(Locale.getDefault(), "%d", i)));
         }
         float colon = paint.measureText(":");
-        int width = (int) Math.ceil(widestDigit * 2 * digitGroups + colon * (digitGroups - 1));
-        elapsedText.setMinWidth(width);
-        durationText.setMinWidth(width);
+        label.setMinWidth((int) Math.ceil(widestDigit * 2 * digitGroups + colon * (digitGroups - 1)));
     }
 
     private static String formatClock(int millis) {

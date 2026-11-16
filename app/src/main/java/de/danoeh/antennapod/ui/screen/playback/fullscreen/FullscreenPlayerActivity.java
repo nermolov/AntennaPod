@@ -359,34 +359,12 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 }
             }
         });
-        transcriptList.getViewTreeObserver().addOnPreDrawListener(this::updateStickyAvatars);
+        transcriptList.getViewTreeObserver().addOnPreDrawListener(() -> {
+            pinToEnd();
+            return true;
+        });
         transcriptList.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight,
                                                   oldBottom) -> onListLayout(bottom - top));
-    }
-
-    private boolean updateStickyAvatars() {
-        pinToEnd();
-        float listTop = transcriptList.getPaddingTop()
-                + getResources().getDimension(R.dimen.fullscreen_transcript_edge_gap)
-                - transcriptList.getSlideOffset();
-        for (int i = 0; i < transcriptList.getChildCount(); i++) {
-            View row = transcriptList.getChildAt(i);
-            View avatar = row.findViewById(R.id.avatar);
-            if (avatar == null) {
-                continue;
-            }
-            float translation = 0;
-            float avatarTop = row.getY() + avatar.getTop();
-            if (avatarTop < listTop) {
-                float maxTranslation = row.getHeight() - row.getPaddingBottom()
-                        - avatar.getTop() - avatar.getHeight();
-                translation = Math.max(0, Math.min(listTop - avatarTop, maxTranslation));
-            }
-            if (avatar.getTranslationY() != translation) {
-                avatar.setTranslationY(translation);
-            }
-        }
-        return true;
     }
 
     private void fadeInPendingRow() {

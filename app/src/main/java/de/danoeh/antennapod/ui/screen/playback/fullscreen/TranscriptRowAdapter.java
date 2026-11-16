@@ -142,6 +142,8 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         holder.text.setTypeface(textTypeface);
         holder.text.setTextColor(ResourcesCompat.getColor(context.getResources(),
                 R.color.fullscreen_player_bubble_text, context.getTheme()));
+        holder.text.setUnspokenAlpha(ResourcesCompat.getFloat(context.getResources(),
+                R.dimen.fullscreen_transcript_unspoken_alpha));
         holder.text.setTextSizePx(context.getResources().getDimension(R.dimen.fullscreen_transcript_text_size));
         holder.text.setTurn(turn);
         applyReveal(holder, position);

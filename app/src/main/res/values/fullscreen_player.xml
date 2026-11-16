@@ -6,6 +6,7 @@
     <color name="fullscreen_player_progress_remaining">#A6787878</color>
 
     <dimen name="fullscreen_transcript_text_size">36sp</dimen>
+    <item name="fullscreen_transcript_unspoken_alpha" format="float" type="dimen">0.4</item>
     <dimen name="fullscreen_cover_corner_radius">14dp</dimen>
 
     <style name="FullscreenPlayerText">

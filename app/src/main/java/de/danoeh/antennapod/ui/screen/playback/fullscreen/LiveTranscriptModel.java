@@ -133,6 +133,14 @@ public class LiveTranscriptModel {
             return charOffsets[i];
         }
 
+        long[] getWordStartTimes() {
+            return wordStarts;
+        }
+
+        int[] getWordCharOffsets() {
+            return charOffsets;
+        }
+
         public long getStartTime() {
             return wordStarts[0];
         }

@@ -6,13 +6,18 @@ import android.graphics.Canvas;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.text.Layout;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.animation.DecelerateInterpolator;
+
+import androidx.core.graphics.ColorUtils;
 
 import java.util.Arrays;
 
@@ -32,6 +37,10 @@ public class RevealTextView extends View {
     private boolean turnFresh = true;
     private ValueAnimator slideAnimator;
     private Drawable bubble;
+    private Spannable text;
+    private ForegroundColorSpan dimSpan;
+    private int unspokenStart = -1;
+    private float unspokenAlpha = 0.4f;
 
     public RevealTextView(Context context) {
         this(context, null);
@@ -78,6 +87,10 @@ public class RevealTextView extends View {
             return;
         }
         turn = newTurn;
+        text = new SpannableString(newTurn.getText());
+        dimSpan = null;
+        unspokenStart = -1;
+        applyUnspoken();
         turnFresh = true;
         if (slideAnimator != null) {
             slideAnimator.cancel();
@@ -105,11 +118,49 @@ public class RevealTextView extends View {
 
     public void setTextColor(int color) {
         paint.setColor(color);
+        dimSpan = null;
+        unspokenStart = -1;
+        applyUnspoken();
+        invalidate();
+    }
+
+    public void setUnspokenAlpha(float alpha) {
+        if (unspokenAlpha == alpha) {
+            return;
+        }
+        unspokenAlpha = alpha;
+        dimSpan = null;
+        unspokenStart = -1;
+        applyUnspoken();
+        invalidate();
+    }
+
+    private void applyUnspoken() {
+        if (turn == null || text == null) {
+            return;
+        }
+        int start = unspokenStartOffset(turn.getWordStartTimes(), turn.getWordCharOffsets(), revealTime,
+                text.length());
+        if (start == unspokenStart) {
+            return;
+        }
+        unspokenStart = start;
+        if (dimSpan != null) {
+            text.removeSpan(dimSpan);
+        }
+        if (start >= text.length()) {
+            dimSpan = null;
+        } else {
+            int color = ColorUtils.setAlphaComponent(paint.getColor(), Math.round(255 * unspokenAlpha));
+            dimSpan = new ForegroundColorSpan(color);
+            text.setSpan(dimSpan, start, text.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
         invalidate();
     }
 
     public void setRevealTime(long timeMs) {
         revealTime = timeMs;
+        applyUnspoken();
         if (layout == null) {
             return;
         }
@@ -132,6 +183,7 @@ public class RevealTextView extends View {
 
     public void setRevealTimeInstant(long timeMs) {
         revealTime = timeMs;
+        applyUnspoken();
         if (layout == null) {
             return;
         }
@@ -238,7 +290,6 @@ public class RevealTextView extends View {
     }
 
     private Built measureTurn(int width) {
-        String text = turn.getText();
         StaticLayout built = StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setLineSpacing(0f, LINE_SPACING_MULTIPLIER)

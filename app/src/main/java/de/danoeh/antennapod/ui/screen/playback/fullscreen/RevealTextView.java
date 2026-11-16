@@ -89,8 +89,7 @@ public class RevealTextView extends View {
         }
         turn = newTurn;
         text = new SpannableString(newTurn.getText());
-        dimSpan = null;
-        unspokenStart = -1;
+        clearUnspoken();
         applyUnspoken();
         turnFresh = true;
         if (slideAnimator != null) {
@@ -119,8 +118,7 @@ public class RevealTextView extends View {
 
     public void setTextColor(int color) {
         paint.setColor(color);
-        dimSpan = null;
-        unspokenStart = -1;
+        clearUnspoken();
         applyUnspoken();
         invalidate();
     }
@@ -130,10 +128,17 @@ public class RevealTextView extends View {
             return;
         }
         unspokenAlpha = alpha;
-        dimSpan = null;
-        unspokenStart = -1;
+        clearUnspoken();
         applyUnspoken();
         invalidate();
+    }
+
+    private void clearUnspoken() {
+        if (dimSpan != null && text != null) {
+            text.removeSpan(dimSpan);
+        }
+        dimSpan = null;
+        unspokenStart = -1;
     }
 
     private long dimTime() {

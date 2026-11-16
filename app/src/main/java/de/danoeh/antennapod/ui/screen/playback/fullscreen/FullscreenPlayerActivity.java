@@ -100,6 +100,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final long SEEK_THROTTLE_MS = 300;
     private static final long TRANSCRIPT_LEAD_MS = 450;
     private static final long POLL_INTERVAL_SECONDS = 3;
+    private static final float OVERLAY_TRANSCRIPT_ALPHA = 0.12f;
     private static final int PROGRESS_MAX = 1000;
     private static final int DESIGN_WIDTH_DP = 1280;
     private static final float DESIGN_SCALE = 0.95f;
@@ -692,6 +693,11 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         return Converter.getDurationStringLong(millis);
     }
 
+    private void setOverlayVisible(boolean visible) {
+        statusOverlay.setVisibility(visible ? View.VISIBLE : View.GONE);
+        transcriptList.setAlpha(visible ? OVERLAY_TRANSCRIPT_ALPHA : 1f);
+    }
+
     private boolean buttonsVisible() {
         return statusOverlay.getVisibility() == View.VISIBLE && statusButtons.getVisibility() == View.VISIBLE;
     }
@@ -742,7 +748,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_MEDIA_REWIND:
-                if (!isPlaybackBlocked()) {
+                if (state != State.DOWNLOADING) {
                     seek(false);
                 }
                 return true;
@@ -865,7 +871,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 showDownloadPrompt();
                 break;
             case TRANSCRIPT:
-                statusOverlay.setVisibility(View.GONE);
+                setOverlayVisible(false);
                 break;
             case NONE:
                 showStatus(getString(R.string.no_transcript_label), COLOR_TITLE_DIM, null, -2, 0, null, 0, null);
@@ -878,7 +884,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private void showStatus(CharSequence title, int titleColor, @Nullable CharSequence detail, int progressPercent,
                             int primaryLabel, @Nullable Runnable primaryAction,
                             int secondaryLabel, @Nullable Runnable secondaryAction) {
-        statusOverlay.setVisibility(View.VISIBLE);
+        setOverlayVisible(true);
         statusTitle.setText(title);
         statusTitle.setTextColor(titleColor);
         if (detail == null) {
@@ -1080,7 +1086,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             setPlaying(false);
             showProgress(lastStatus);
         } else {
-            statusOverlay.setVisibility(View.GONE);
+            setOverlayVisible(false);
             if (resumeAfter) {
                 resumeAfter = false;
                 setPlaying(true);
@@ -1105,7 +1111,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         state = State.TRANSCRIPT;
         jobId = null;
         lastStatus = null;
-        statusOverlay.setVisibility(View.GONE);
+        setOverlayVisible(false);
         gate.update(0, 0, true);
         if (resumeAfter) {
             resumeAfter = false;
@@ -1117,7 +1123,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         stopPolling();
         state = State.TRANSCRIPT;
         jobId = null;
-        statusOverlay.setVisibility(View.GONE);
+        setOverlayVisible(false);
         liveModel = new LiveTranscriptModel(transcript);
         adapter.setModel(liveModel);
         modelReady = true;

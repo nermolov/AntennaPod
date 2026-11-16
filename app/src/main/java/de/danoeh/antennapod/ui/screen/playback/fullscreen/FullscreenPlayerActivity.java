@@ -3,7 +3,9 @@ package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Outline;
@@ -100,6 +102,8 @@ import java.util.concurrent.TimeUnit;
 
 public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final String TAG = "FullscreenPlayer";
+    private static final String EXTRA_MEDIA_ID = "media_id";
+    private static final long REQUESTED_MEDIA_GRACE_MS = 3000;
     private static final long SEEK_THROTTLE_MS = 300;
     private static final long TRANSCRIPT_LEAD_MS = 450;
     private static final long POLL_INTERVAL_SECONDS = 3;
@@ -111,6 +115,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final int MAX_DENSITY_DPI = 640;
     private static final int COLOR_TITLE = 0xFFFFFFFF;
     private static final int COLOR_TITLE_DIM = 0x80FFFFFF;
+
+    private long requestedMediaId;
+    private long requestedAtMs;
 
     private enum State { LOADING, PROMPT_BUSY, PROMPT_DOWNLOAD, DOWNLOADING, PROGRESS, TRANSCRIPT, NONE, FAILED }
 
@@ -246,9 +253,44 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         super.attachBaseContext(newBase.createConfigurationContext(configuration));
     }
 
+    public static Intent getIntent(Context context, long feedMediaId) {
+        Intent intent = new Intent(context, FullscreenPlayerActivity.class);
+        intent.putExtra(EXTRA_MEDIA_ID, feedMediaId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (!(context instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        return intent;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        requestedMediaId = intent.getLongExtra(EXTRA_MEDIA_ID, 0);
+        requestedAtMs = SystemClock.elapsedRealtime();
+        if (started) {
+            loadMedia();
+        }
+    }
+
+    private long currentMediaId() {
+        if (requestedMediaId > 0) {
+            if (PlaybackPreferences.getCurrentlyPlayingFeedMediaId() == requestedMediaId
+                    || SystemClock.elapsedRealtime() - requestedAtMs > REQUESTED_MEDIA_GRACE_MS) {
+                requestedMediaId = 0;
+            } else {
+                return requestedMediaId;
+            }
+        }
+        return PlaybackPreferences.getCurrentlyPlayingFeedMediaId();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestedMediaId = getIntent().getLongExtra(EXTRA_MEDIA_ID, 0);
+        requestedAtMs = SystemClock.elapsedRealtime();
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         applyBackground(PlayerColorScheme.DEFAULT_BACKGROUND);
@@ -466,7 +508,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             disposable.dispose();
         }
         disposable = Maybe.<FeedMedia>fromCallable(() -> {
-            return DBReader.getFeedMedia(PlaybackPreferences.getCurrentlyPlayingFeedMediaId());
+            return DBReader.getFeedMedia(currentMediaId());
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -587,7 +629,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         if (media == null) {
             return;
         }
-        long playingId = PlaybackPreferences.getCurrentlyPlayingFeedMediaId();
+        long playingId = currentMediaId();
         if (playingId > 0 && playingId != media.getId()) {
             loadMedia();
         } else if (isPlaybackBlocked() && isPlaybackActive()) {

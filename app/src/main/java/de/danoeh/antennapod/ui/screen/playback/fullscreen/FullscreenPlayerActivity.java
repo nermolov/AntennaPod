@@ -225,6 +225,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private boolean smoothScrollPending = false;
     private final List<View> fadeInRows = new ArrayList<>();
     private boolean jumpPending = true;
+    private boolean suppressAnimations = false;
     private boolean modelReady = false;
     private boolean started = false;
     private int lastListHeight = -1;
@@ -285,6 +286,11 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         DefaultItemAnimator animator = new DefaultItemAnimator() {
             @Override
             public boolean animateAdd(RecyclerView.ViewHolder holder) {
+                if (suppressAnimations) {
+                    holder.itemView.setAlpha(1f);
+                    dispatchAddFinished(holder);
+                    return false;
+                }
                 holder.itemView.setAlpha(0f);
                 fadeInRows.add(holder.itemView);
                 dispatchAddFinished(holder);
@@ -305,6 +311,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             public boolean animateDisappearance(@NonNull RecyclerView.ViewHolder viewHolder,
                                                 @NonNull RecyclerView.ItemAnimator.ItemHolderInfo preLayoutInfo,
                                                 @Nullable RecyclerView.ItemAnimator.ItemHolderInfo postLayoutInfo) {
+                if (suppressAnimations) {
+                    dispatchMoveFinished(viewHolder);
+                    return false;
+                }
                 if (postLayoutInfo == null) {
                     return super.animateDisappearance(viewHolder, preLayoutInfo, postLayoutInfo);
                 }
@@ -629,16 +639,27 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         lastTime = time;
         final int previousCount = adapter.getItemCount();
-        adapter.setTime(time + TRANSCRIPT_LEAD_MS);
+        long transcriptTime = time + TRANSCRIPT_LEAD_MS;
+        int targetCount = adapter.visibleCountAt(transcriptTime);
+        boolean skip = jump || targetCount - previousCount > 1 || targetCount < previousCount;
+        if (skip) {
+            suppressAnimations = true;
+            transcriptList.getItemAnimator().endAnimations();
+            fadeInRows.clear();
+            adapter.jumpTo(transcriptTime);
+            transcriptList.post(() -> suppressAnimations = false);
+        } else {
+            adapter.setTime(transcriptTime);
+        }
         updateProgress(time);
         int count = adapter.getItemCount();
         if (count == 0) {
             return;
         }
-        if (jump || count - previousCount > 1) {
+        if (skip) {
             jumpPending = false;
-            alignPending = true;
-            smoothScrollPending = true;
+            alignPending = false;
+            smoothScrollPending = false;
             transcriptList.stopScroll();
             layoutManager.scrollToPositionWithOffset(count - 1, 0);
         } else if (count != previousCount) {

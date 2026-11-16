@@ -41,6 +41,10 @@ public class TranscriptRowAdapter extends RecyclerView.Adapter<TranscriptRowAdap
         notifyDataSetChanged();
     }
 
+    public void onModelGrown() {
+        trackedWords = -1;
+    }
+
     public boolean setTime(long timeMs) {
         currentTime = timeMs;
         if (model == null) {

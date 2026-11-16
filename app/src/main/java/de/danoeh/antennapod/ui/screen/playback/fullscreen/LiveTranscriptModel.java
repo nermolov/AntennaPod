@@ -7,10 +7,18 @@ import java.util.List;
 
 public class LiveTranscriptModel {
     private final List<Turn> turns = new ArrayList<>();
-    private final int speakerCount;
+    private int speakerCount;
+    private long readyUntilMs;
+    private boolean complete;
 
     public LiveTranscriptModel(DiarizedTranscript transcript) {
-        for (DiarizedTranscript.Turn source : transcript.getTurns()) {
+        appendTurns(transcript.getTurns());
+        speakerCount = Math.max(speakerCount, transcript.getSpeakerCount());
+    }
+
+    public void appendTurns(List<DiarizedTranscript.Turn> newTurns) {
+        for (DiarizedTranscript.Turn source : newTurns) {
+            speakerCount = Math.max(speakerCount, source.getSpeakerIndex() + 1);
             if (source.getWords().length == 0) {
                 continue;
             }
@@ -21,7 +29,22 @@ public class LiveTranscriptModel {
             }
             turns.add(builder.build());
         }
-        speakerCount = transcript.getSpeakerCount();
+    }
+
+    public long getReadyUntilMs() {
+        return readyUntilMs;
+    }
+
+    public void setReadyUntilMs(long readyUntilMs) {
+        this.readyUntilMs = readyUntilMs;
+    }
+
+    public boolean isComplete() {
+        return complete;
+    }
+
+    public void setComplete(boolean complete) {
+        this.complete = complete;
     }
 
     public int getTurnCount() {

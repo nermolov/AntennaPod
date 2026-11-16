@@ -79,4 +79,37 @@ public class LiveTranscriptModelTest {
         assertEquals(2, model.spokenWordCountAt(0, 2500));
         assertEquals(3900, model.getTurn(0).getEndTime());
     }
+
+    @Test
+    public void testAppendTurns() {
+        LiveTranscriptModel model = new LiveTranscriptModel(new DiarizedTranscript(new ArrayList<>()));
+        assertEquals(0, model.getSpeakerCount());
+        List<DiarizedTranscript.Turn> first = new ArrayList<>();
+        first.add(turn("A", 0, new String[] {"Hello"}, new long[] {1000}, new long[] {1300}));
+        model.appendTurns(first);
+        assertEquals(1, model.getTurnCount());
+        assertEquals(1, model.getSpeakerCount());
+        assertEquals(1, model.visibleTurnCountAt(5000));
+        List<DiarizedTranscript.Turn> second = new ArrayList<>();
+        second.add(turn("C", 2, new String[] {"Hi", "you"}, new long[] {4000, 4500}, new long[] {4400, 4900}));
+        second.add(turn("B", 1, new String[0], new long[0], new long[0]));
+        model.appendTurns(second);
+        assertEquals(2, model.getTurnCount());
+        assertEquals(3, model.getSpeakerCount());
+        assertEquals(1, model.visibleTurnCountAt(3999));
+        assertEquals(2, model.visibleTurnCountAt(4000));
+        assertEquals(2, model.spokenWordCountAt(1, 4500));
+        assertEquals("Hi you", model.getTurn(1).getText());
+    }
+
+    @Test
+    public void testReadyUntilAndComplete() {
+        LiveTranscriptModel model = new LiveTranscriptModel(transcript());
+        assertEquals(0, model.getReadyUntilMs());
+        assertEquals(false, model.isComplete());
+        model.setReadyUntilMs(120000);
+        model.setComplete(true);
+        assertEquals(120000, model.getReadyUntilMs());
+        assertEquals(true, model.isComplete());
+    }
 }

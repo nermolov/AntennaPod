@@ -1,5 +1,8 @@
 package de.danoeh.antennapod.ui.screen.playback.fullscreen;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -84,7 +87,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -258,6 +263,51 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                                               @NonNull RecyclerView.ItemAnimator.ItemHolderInfo postInfo) {
                 dispatchMoveFinished(viewHolder);
                 return false;
+            }
+
+            private final Map<RecyclerView.ViewHolder, ValueAnimator> holds = new HashMap<>();
+
+            @Override
+            public boolean animateDisappearance(@NonNull RecyclerView.ViewHolder viewHolder,
+                                                @NonNull RecyclerView.ItemAnimator.ItemHolderInfo preLayoutInfo,
+                                                @Nullable RecyclerView.ItemAnimator.ItemHolderInfo postLayoutInfo) {
+                if (postLayoutInfo == null) {
+                    return super.animateDisappearance(viewHolder, preLayoutInfo, postLayoutInfo);
+                }
+                ValueAnimator hold = ValueAnimator.ofFloat(0f, 1f);
+                hold.setDuration(RevealTextView.SLIDE_DURATION_MS);
+                hold.addListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        holds.remove(viewHolder);
+                        dispatchMoveFinished(viewHolder);
+                    }
+                });
+                holds.put(viewHolder, hold);
+                hold.start();
+                return false;
+            }
+
+            @Override
+            public boolean isRunning() {
+                return !holds.isEmpty() || super.isRunning();
+            }
+
+            @Override
+            public void endAnimation(@NonNull RecyclerView.ViewHolder item) {
+                ValueAnimator hold = holds.get(item);
+                if (hold != null) {
+                    hold.end();
+                }
+                super.endAnimation(item);
+            }
+
+            @Override
+            public void endAnimations() {
+                for (ValueAnimator hold : new ArrayList<>(holds.values())) {
+                    hold.end();
+                }
+                super.endAnimations();
             }
 
             @Override

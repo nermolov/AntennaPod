@@ -11,6 +11,7 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -91,6 +92,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -229,6 +231,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private long lastTime = -1;
     private long lastDisplayedSecond = -1;
     private long lastDisplayedDuration = -1;
+    private int reservedTimeDigitGroups = -1;
     private long lastSeekKeyTime = 0;
 
     @Override
@@ -266,6 +269,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         progress = findViewById(R.id.progress);
         elapsedText = findViewById(R.id.elapsedText);
         durationText = findViewById(R.id.durationText);
+        reserveTimeLabelWidth(false);
         statusOverlay = findViewById(R.id.statusOverlay);
         statusTitle = findViewById(R.id.statusTitle);
         statusProgress = findViewById(R.id.statusProgress);
@@ -673,8 +677,27 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         }
         if (duration != lastDisplayedDuration) {
             lastDisplayedDuration = duration;
-            durationText.setText(formatClock(converter.convert((int) duration)));
+            int scaledDuration = converter.convert((int) duration);
+            reserveTimeLabelWidth(scaledDuration >= 3600 * 1000);
+            durationText.setText(formatClock(scaledDuration));
         }
+    }
+
+    private void reserveTimeLabelWidth(boolean withHours) {
+        int digitGroups = withHours ? 3 : 2;
+        if (digitGroups == reservedTimeDigitGroups) {
+            return;
+        }
+        reservedTimeDigitGroups = digitGroups;
+        TextPaint paint = elapsedText.getPaint();
+        float widestDigit = 0;
+        for (int i = 0; i < 10; i++) {
+            widestDigit = Math.max(widestDigit, paint.measureText(String.format(Locale.getDefault(), "%d", i)));
+        }
+        float colon = paint.measureText(":");
+        int width = (int) Math.ceil(widestDigit * 2 * digitGroups + colon * (digitGroups - 1));
+        elapsedText.setMinWidth(width);
+        durationText.setMinWidth(width);
     }
 
     private static String formatClock(int millis) {

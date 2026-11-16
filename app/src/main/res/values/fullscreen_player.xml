@@ -29,5 +29,7 @@
         <item name="android:textColor">@color/fullscreen_player_text_primary</item>
         <item name="android:textSize">18sp</item>
         <item name="android:includeFontPadding">false</item>
+        <item name="android:fontFeatureSettings">"tnum"</item>
+        <item name="android:textDirection">ltr</item>
     </style>
 </resources>

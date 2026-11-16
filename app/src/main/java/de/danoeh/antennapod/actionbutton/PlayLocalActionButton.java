@@ -6,9 +6,6 @@ import androidx.annotation.StringRes;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
-import de.danoeh.antennapod.model.playback.MediaType;
-import de.danoeh.antennapod.playback.service.PlaybackServiceInterface;
-import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 
 public class PlayLocalActionButton extends ItemActionButton {
 
@@ -35,12 +32,6 @@ public class PlayLocalActionButton extends ItemActionButton {
             return;
         }
 
-        new PlaybackServiceStarter(context, media)
-                .callEvenIfRunning(true)
-                .start();
-
-        if (media.getMediaType() == MediaType.VIDEO) {
-            context.startActivity(PlaybackServiceInterface.getPlayerActivityIntent(context, media));
-        }
+        PlayStarter.playAndOpenPlayer(context, media);
     }
 }

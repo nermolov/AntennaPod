@@ -8,9 +8,6 @@ import androidx.annotation.StringRes;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
-import de.danoeh.antennapod.model.playback.MediaType;
-import de.danoeh.antennapod.playback.service.PlaybackServiceInterface;
-import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 import de.danoeh.antennapod.storage.preferences.UsageStatistics;
 
 public class StreamActionButton extends ItemActionButton {
@@ -39,12 +36,6 @@ public class StreamActionButton extends ItemActionButton {
         }
         UsageStatistics.logAction(UsageStatistics.ACTION_STREAM);
 
-        new PlaybackServiceStarter(context, media)
-                .callEvenIfRunning(true)
-                .start();
-
-        if (media.getMediaType() == MediaType.VIDEO) {
-            context.startActivity(PlaybackServiceInterface.getPlayerActivityIntent(context, media));
-        }
+        PlayStarter.playAndOpenPlayer(context, media);
     }
 }

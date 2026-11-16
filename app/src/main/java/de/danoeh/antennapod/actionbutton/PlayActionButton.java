@@ -5,14 +5,11 @@ import android.util.Log;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.StringRes;
 import de.danoeh.antennapod.R;
-import de.danoeh.antennapod.playback.service.PlaybackServiceInterface;
-import de.danoeh.antennapod.playback.service.PlaybackServiceStarter;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
-import de.danoeh.antennapod.model.playback.MediaType;
 import org.greenrobot.eventbus.EventBus;
 
 import java.util.Collections;
@@ -51,12 +48,6 @@ public class PlayActionButton extends ItemActionButton {
             EventBus.getDefault().post(new MessageEvent(context.getString(R.string.error_file_not_found)));
             return;
         }
-        new PlaybackServiceStarter(context, media)
-                .callEvenIfRunning(true)
-                .start();
-
-        if (media.getMediaType() == MediaType.VIDEO) {
-            context.startActivity(PlaybackServiceInterface.getPlayerActivityIntent(context, media));
-        }
+        PlayStarter.playAndOpenPlayer(context, media);
     }
 }

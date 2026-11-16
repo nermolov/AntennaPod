@@ -59,6 +59,20 @@ public class RevealTextView extends View {
         return count;
     }
 
+    static int unspokenStartOffset(long[] wordStarts, int[] charOffsets, long timeMs, int textLength) {
+        int low = 0;
+        int high = wordStarts.length;
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (wordStarts[mid] <= timeMs) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return low >= charOffsets.length ? textLength : charOffsets[low];
+    }
+
     public void setTurn(LiveTranscriptModel.Turn newTurn) {
         if (newTurn == turn) {
             return;

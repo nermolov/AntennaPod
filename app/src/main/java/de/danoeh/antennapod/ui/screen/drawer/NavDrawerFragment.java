@@ -29,7 +29,6 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.shape.ShapeAppearanceModel;
 
@@ -362,7 +361,6 @@ public class NavDrawerFragment extends Fragment implements SharedPreferences.OnS
                 if (position < navAdapter.getSubscriptionOffset()) {
                     String tag = navAdapter.getFragmentTags().get(position);
                     ((MainActivity) getActivity()).loadFragment(tag, null);
-                    ((MainActivity) getActivity()).getBottomSheet().setState(BottomSheetBehavior.STATE_COLLAPSED);
                 } else {
                     int pos = position - navAdapter.getSubscriptionOffset();
                     DrawerItem clickedItem = flatItemList.get(pos);
@@ -370,8 +368,6 @@ public class NavDrawerFragment extends Fragment implements SharedPreferences.OnS
                     if (clickedItem.isFeed()) {
                         long feedId = clickedItem.asFeed().getId();
                         ((MainActivity) getActivity()).loadFeedFragmentById(feedId, null);
-                        ((MainActivity) getActivity()).getBottomSheet()
-                                .setState(BottomSheetBehavior.STATE_COLLAPSED);
                     } else {
                         NavDrawerData.TagItem folder = clickedItem.asTag();
                         if (openFolders.contains(folder.getTitle())) {

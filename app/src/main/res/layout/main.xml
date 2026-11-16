@@ -44,16 +44,6 @@
                 android:foreground="?android:windowContentOverlay"
                 tools:background="@android:color/holo_red_dark" />
 
-            <androidx.fragment.app.FragmentContainerView
-                android:id="@+id/audioplayerFragment"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="?android:attr/colorBackground"
-                android:elevation="8dp"
-                android:visibility="gone"
-                android:fitsSystemWindows="false"
-                app:layout_behavior="de.danoeh.antennapod.ui.common.LockableBottomSheetBehavior" />
-
         </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
         <androidx.fragment.app.FragmentContainerView

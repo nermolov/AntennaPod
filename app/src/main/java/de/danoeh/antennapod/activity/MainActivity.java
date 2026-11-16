@@ -13,7 +13,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.RelativeLayout;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
@@ -35,7 +34,6 @@ import com.bumptech.glide.Glide;
 import androidx.media3.session.MediaController;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.snackbar.Snackbar;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.EpisodeDownloadEvent;
@@ -52,7 +50,6 @@ import de.danoeh.antennapod.playback.cast.CastEnabledActivity;
 import de.danoeh.antennapod.playback.service.PlaybackController;
 import de.danoeh.antennapod.storage.databasemaintenanceservice.DatabaseMaintenanceWorker;
 import de.danoeh.antennapod.storage.importexport.AutomaticDatabaseExportWorker;
-import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.appstartintent.MainActivityStarter;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
@@ -75,14 +72,11 @@ import de.danoeh.antennapod.ui.screen.drawer.NavigationNames;
 import de.danoeh.antennapod.ui.screen.episode.ItemPagerFragment;
 import de.danoeh.antennapod.ui.screen.feed.FeedItemlistFragment;
 import de.danoeh.antennapod.ui.screen.home.HomeFragment;
-import de.danoeh.antennapod.ui.screen.playback.audio.AudioPlayerFragment;
 import de.danoeh.antennapod.ui.screen.preferences.PreferenceActivity;
 import de.danoeh.antennapod.ui.screen.queue.QueueFragment;
 import de.danoeh.antennapod.ui.screen.rating.RatingDialogManager;
 import de.danoeh.antennapod.ui.screen.subscriptions.SubscriptionFragment;
 import de.danoeh.antennapod.ui.statistics.StatisticsFragment;
-import de.danoeh.antennapod.ui.common.BottomSheetBackPressedCallback;
-import de.danoeh.antennapod.ui.common.LockableBottomSheetBehavior;
 import org.apache.commons.lang3.ArrayUtils;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -110,8 +104,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
     private @Nullable ActionBarDrawerToggle drawerToggle;
     private BottomNavigation bottomNavigation;
     private View navDrawer;
-    private LockableBottomSheetBehavior<FragmentContainerView> sheetBehavior;
-    private BottomSheetBackPressedCallback bottomSheetBackPressedCallback;
     private OnBackPressedCallback openDefaultPageBackPressedCallback;
     private int lastTheme = 0;
     private Insets systemBarInsets = Insets.NONE;
@@ -133,7 +125,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         bottomNavigation = new BottomNavigation(findViewById(R.id.bottomNavigationView)) {
             @Override
             public void onItemSelected(@IdRes int itemId) {
-                sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
                 if (itemId == R.id.bottom_navigation_settings) {
                     startActivity(new Intent(MainActivity.this, PreferenceActivity.class));
                     return;
@@ -170,7 +161,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
             });
         }
 
-        // Consume navigation bar insets - we apply them in setPlayerVisible()
+        // Consume navigation bar insets - we apply them in updateInsets()
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main_view), (v, insets) -> {
             systemBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             updateInsets();
@@ -204,16 +195,8 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         FragmentTransaction transaction = fm.beginTransaction();
         NavDrawerFragment navDrawerFragment = new NavDrawerFragment();
         transaction.replace(R.id.navDrawerFragment, navDrawerFragment, NavDrawerFragment.TAG);
-        AudioPlayerFragment audioPlayerFragment = new AudioPlayerFragment();
-        transaction.replace(R.id.audioplayerFragment, audioPlayerFragment, AudioPlayerFragment.TAG);
         transaction.commit();
 
-        FragmentContainerView bottomSheet = findViewById(R.id.audioplayerFragment);
-        sheetBehavior = (LockableBottomSheetBehavior<FragmentContainerView>) BottomSheetBehavior.from(bottomSheet);
-        sheetBehavior.setHideable(false);
-        sheetBehavior.setDraggable(false);
-        sheetBehavior.addBottomSheetCallback(bottomSheetCallback);
-        bottomSheetBackPressedCallback = new BottomSheetBackPressedCallback(false, sheetBehavior, bottomSheet);
 
         FeedUpdateManager.getInstance().restartUpdateAlarm(this, false);
         SynchronizationQueue.getInstance().syncIfNotSyncedRecently();
@@ -296,44 +279,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         outState.putInt(KEY_GENERATED_VIEW_ID, View.generateViewId());
     }
 
-    private final BottomSheetBehavior.BottomSheetCallback bottomSheetCallback = new AntennaPodBottomSheetCallback();
-
-    private class AntennaPodBottomSheetCallback extends BottomSheetBehavior.BottomSheetCallback {
-        @Override
-        public void onStateChanged(@NonNull View view, int state) {
-            if (state == BottomSheetBehavior.STATE_COLLAPSED) {
-                onSlide(view, 0.0f);
-                bottomSheetBackPressedCallback.setEnabled(false);
-            } else if (state == BottomSheetBehavior.STATE_EXPANDED) {
-                onSlide(view, 1.0f);
-                bottomSheetBackPressedCallback.setEnabled(true);
-            } else if (state == BottomSheetBehavior.STATE_HIDDEN) {
-                PlaybackController.bindToMedia3Service(MainActivity.this, controller -> {
-                    controller.clearMediaItems();
-                    controller.stop();
-                });
-                PlaybackPreferences.writeNoMediaPlaying();
-                setPlayerVisible(false);
-                bottomSheetBackPressedCallback.setEnabled(false);
-            }
-        }
-
-        @Override
-        public void onSlide(@NonNull View view, float slideOffset) {
-            AudioPlayerFragment audioPlayer = (AudioPlayerFragment) getSupportFragmentManager()
-                    .findFragmentByTag(AudioPlayerFragment.TAG);
-            if (audioPlayer == null) {
-                return;
-            }
-
-            if (slideOffset == 0.0f) { //STATE_COLLAPSED
-                audioPlayer.scrollToPage(AudioPlayerFragment.POS_COVER);
-            }
-
-            audioPlayer.fadePlayerToToolbar(slideOffset);
-        }
-    }
-
     @Override
     public void setupToolbarToggle(@NonNull MaterialToolbar toolbar, boolean displayUpArrow) {
         if (drawerLayout != null) { // Tablet layout does not have a drawer
@@ -380,42 +325,16 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
         return drawerLayout != null && navDrawer != null && drawerLayout.isDrawerOpen(navDrawer);
     }
 
-    public LockableBottomSheetBehavior<FragmentContainerView> getBottomSheet() {
-        return sheetBehavior;
-    }
-
     private void updateInsets() {
-        setPlayerVisible(findViewById(R.id.audioplayerFragment).getVisibility() == View.VISIBLE);
-    }
-
-    public void setPlayerVisible(boolean visible) {
-        getBottomSheet().setLocked(!visible);
-        findViewById(R.id.audioplayerFragment).setVisibility(visible ? View.VISIBLE : View.GONE);
-        if (visible) {
-            bottomSheetCallback.onStateChanged(null, getBottomSheet().getState()); // Update toolbar visibility
-        } else {
-            getBottomSheet().setState(BottomSheetBehavior.STATE_COLLAPSED);
-        }
         View bottomPaddingView = findViewById(R.id.bottom_padding);
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) bottomPaddingView.getLayoutParams();
         params.height = systemBarInsets.bottom;
         bottomPaddingView.setLayoutParams(params);
 
-        int externalPlayerHeight = (int) getResources().getDimension(R.dimen.external_player_height);
         FragmentContainerView mainView = findViewById(R.id.main_content_view);
         params = (ViewGroup.MarginLayoutParams) mainView.getLayoutParams();
-        params.setMargins(systemBarInsets.left, 0, systemBarInsets.right, (visible ? externalPlayerHeight : 0));
+        params.setMargins(systemBarInsets.left, 0, systemBarInsets.right, 0);
         mainView.setLayoutParams(params);
-        sheetBehavior.setPeekHeight(externalPlayerHeight);
-        sheetBehavior.setHideable(true);
-        sheetBehavior.setGestureInsetBottomIgnored(true);
-
-        FragmentContainerView playerView = findViewById(R.id.playerFragment);
-        ViewGroup.MarginLayoutParams playerParams = (ViewGroup.MarginLayoutParams) playerView.getLayoutParams();
-        playerParams.setMargins(systemBarInsets.left, 0, systemBarInsets.right, 0);
-        playerView.setLayoutParams(playerParams);
-        RelativeLayout playerContent = findViewById(R.id.playerContent);
-        playerContent.setPadding(systemBarInsets.left, systemBarInsets.top, systemBarInsets.right, 0);
     }
 
     public Fragment createFragmentInstance(String tag, Bundle args) {
@@ -485,7 +404,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
     }
 
     public void loadFragment(Fragment fragment) {
-        boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
+        final boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
         FragmentManager fragmentManager = getSupportFragmentManager();
         // Clear all synchronously to avoid conflicting with predictive back gesture cancellation
         fragmentManager.popBackStackImmediate(null, FragmentManager.POP_BACK_STACK_INCLUSIVE);
@@ -519,7 +438,7 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
 
     public void loadChildFragment(Fragment fragment, String navigationTag) {
         Objects.requireNonNull(fragment);
-        boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
+        final boolean focusWasInContent = findViewById(R.id.main_content_view).hasFocus();
         if (navigationTag != null && bottomNavigation != null) {
             bottomNavigation.updateSelectedItem(navigationTag);
         }
@@ -583,21 +502,11 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
     }
 
     @Override
-    protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-
-        if (getBottomSheet().getState() == BottomSheetBehavior.STATE_EXPANDED) {
-            bottomSheetCallback.onSlide(null, 1.0f);
-        }
-    }
-
-    @Override
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
         new RatingDialogManager(this).showIfNeeded();
         getOnBackPressedDispatcher().addCallback(this, openDefaultPageBackPressedCallback);
-        getOnBackPressedDispatcher().addCallback(this, bottomSheetBackPressedCallback);
     }
 
     @Override
@@ -687,15 +596,8 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onEventMainThread(MessageEvent event) {
         Log.d(TAG, "onEvent(" + event + ")");
-        Snackbar snackbar;
-        if (getBottomSheet().getState() == BottomSheetBehavior.STATE_EXPANDED) {
-            snackbar = Snackbar.make(findViewById(android.R.id.content), event.message, Snackbar.LENGTH_LONG);
-        } else {
-            snackbar = Snackbar.make(findViewById(R.id.main_content_view), event.message, Snackbar.LENGTH_LONG);
-            if (findViewById(R.id.audioplayerFragment).getVisibility() == View.VISIBLE) {
-                snackbar.setAnchorView(findViewById(R.id.audioplayerFragment));
-            }
-        }
+        Snackbar snackbar = Snackbar.make(findViewById(R.id.main_content_view), event.message,
+                Snackbar.LENGTH_LONG);
         snackbar.show();
 
         if (event.action != null) {
@@ -730,7 +632,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
                 return;
             }
             loadChildFragment(ItemPagerFragment.newInstance(episodeId));
-            sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
         } else if (intent.hasExtra(MainActivityStarter.EXTRA_FEED_ID)) {
             long feedId = intent.getLongExtra(MainActivityStarter.EXTRA_FEED_ID, 0);
             Bundle args = intent.getBundleExtra(MainActivityStarter.EXTRA_FRAGMENT_ARGS);
@@ -741,7 +642,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
                     loadChildFragment(FeedItemlistFragment.newInstance(feedId));
                 }
             }
-            sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
         } else if (intent.hasExtra(MainActivityStarter.EXTRA_FRAGMENT_TAG)) {
             String tag = intent.getStringExtra(MainActivityStarter.EXTRA_FRAGMENT_TAG);
             Bundle args = intent.getBundleExtra(MainActivityStarter.EXTRA_FRAGMENT_ARGS);
@@ -752,7 +652,6 @@ public class MainActivity extends CastEnabledActivity implements NavigationToolb
                     loadChildFragment(createFragmentInstance(tag, args), tag);
                 }
             }
-            sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
         } else if (intent.getBooleanExtra(MainActivityStarter.EXTRA_OPEN_PLAYER, false)) {
             startActivity(new Intent(this, FullscreenPlayerActivity.class));
         } else {

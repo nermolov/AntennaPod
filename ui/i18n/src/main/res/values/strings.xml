@@ -304,9 +304,10 @@
     <string name="no_transcript_label">No transcript</string>
     <string name="transcript_checking">Checking for a transcript…</string>
     <string name="transcript_not_configured">Set up the transcription server in settings to get transcripts.</string>
-    <string name="transcript_prompt_title">No transcript for this episode yet. Transcribe it now?</string>
-    <string name="transcript_prompt_estimate">About %1$d min</string>
-    <string name="transcript_transcribe_label">Transcribe</string>
+    <string name="transcript_busy_title">Transcription server is busy</string>
+    <string name="transcript_busy_detail">Another episode is being transcribed. Cancel it to transcribe this one.</string>
+    <string name="transcript_cancel_and_transcribe_label">Cancel it and transcribe this episode</string>
+    <string name="transcript_job_lost">The transcription job was cancelled.</string>
     <string name="transcript_not_now_label">Not now</string>
     <string name="transcript_download_prompt_title">Transcripts need the episode to be downloaded first.</string>
     <string name="transcript_download_and_transcribe_label">Download and transcribe</string>

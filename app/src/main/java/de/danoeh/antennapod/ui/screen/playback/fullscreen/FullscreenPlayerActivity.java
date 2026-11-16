@@ -107,9 +107,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
     private static final int COLOR_TITLE = 0xFFFFFFFF;
     private static final int COLOR_TITLE_DIM = 0x80FFFFFF;
 
-    private enum State { LOADING, PROMPT, PROMPT_DOWNLOAD, DOWNLOADING, PROGRESS, TRANSCRIPT, NONE, FAILED }
+    private enum State { LOADING, PROMPT_BUSY, PROMPT_DOWNLOAD, DOWNLOADING, PROGRESS, TRANSCRIPT, NONE, FAILED }
 
-    private enum Retry { LOOKUP, SUBMIT, DOWNLOAD }
+    private enum Retry { LOOKUP, SUBMIT, DOWNLOAD, BUSY }
 
     private static class Outcome {
         final State state;
@@ -823,8 +823,8 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
 
     private void renderCurrentState() {
         switch (state) {
-            case PROMPT:
-                showPrompt();
+            case PROMPT_BUSY:
+                showBusyPrompt();
                 break;
             case PROMPT_DOWNLOAD:
                 showDownloadPrompt();
@@ -888,11 +888,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         showStatus(getString(R.string.transcript_checking), COLOR_TITLE, null, -1, 0, null, 0, null);
     }
 
-    private void showPrompt() {
-        int minutes = TranscriptionProgressFormatter.estimateMinutes(media.getDuration());
-        showStatus(getString(R.string.transcript_prompt_title), COLOR_TITLE,
-                getString(R.string.transcript_prompt_estimate, minutes), -2,
-                R.string.transcript_transcribe_label, this::startSubmit,
+    private void showBusyPrompt() {
+        showStatus(getString(R.string.transcript_busy_title), COLOR_TITLE,
+                getString(R.string.transcript_busy_detail), -2,
+                R.string.transcript_cancel_and_transcribe_label, this::cancelOthersAndSubmit,
                 R.string.transcript_not_now_label, this::declineTranscript);
     }
 
@@ -954,6 +953,9 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             case DOWNLOAD:
                 startDownload();
                 break;
+            case BUSY:
+                cancelOthersAndSubmit();
+                break;
             default:
                 startLookup();
                 break;
@@ -971,11 +973,16 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 showTranscript(outcome.transcript);
                 break;
             case PROGRESS:
-                enterProgress(outcome.jobId);
+                if (outcome.jobId == null) {
+                    stopWork();
+                    startSubmit();
+                } else {
+                    enterProgress(outcome.jobId);
+                }
                 break;
-            case PROMPT:
-                state = State.PROMPT;
-                showPrompt();
+            case PROMPT_BUSY:
+                state = State.PROMPT_BUSY;
+                showBusyPrompt();
                 break;
             case PROMPT_DOWNLOAD:
                 state = State.PROMPT_DOWNLOAD;
@@ -1062,10 +1069,10 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
         state = State.LOADING;
         showLoading();
         final FeedMedia target = media;
-        runWork(() -> lookup(target));
+        runWork(() -> lookup(target, true));
     }
 
-    private Outcome lookup(FeedMedia target) {
+    private Outcome lookup(FeedMedia target, boolean autoSubmit) {
         GeneratedTranscript stored = DBReader.getGeneratedTranscript(target.getItemId());
         if (stored != null && stored.getTranscript() != null) {
             return Outcome.transcript(stored.getTranscript());
@@ -1085,7 +1092,13 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
             TranscriptionClient client = TranscriptionClient.fromPreferences();
             Lookup found = client.lookupBySha256(hashOf(target, file));
             if (found == null) {
-                return Outcome.of(State.PROMPT);
+                if (!client.listActiveJobs().isEmpty()) {
+                    return Outcome.of(State.PROMPT_BUSY);
+                }
+                if (autoSubmit) {
+                    return Outcome.of(State.PROGRESS);
+                }
+                return Outcome.failed(getString(R.string.transcript_job_lost), Retry.SUBMIT);
             }
             if (found.isDone()) {
                 return finish(target, client.getTranscriptResult(found.transcriptId));
@@ -1203,7 +1216,7 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 stopWork();
                 workDisposable = Single.fromCallable(() -> {
                     DBWriter.clearTranscriptionJob(target.getItemId()).get();
-                    return lookup(target);
+                    return lookup(target, false);
                 })
                         .subscribeOn(Schedulers.io())
                         .observeOn(AndroidSchedulers.mainThread())
@@ -1234,17 +1247,38 @@ public class FullscreenPlayerActivity extends AppCompatActivity {
                 }
             }
             DBWriter.clearTranscriptionJob(target.getItemId()).get();
-            return Outcome.of(State.PROMPT);
+            return Outcome.of(State.NONE);
         })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(outcome -> {
                     jobId = null;
-                    if (outcome.state == State.PROMPT) {
+                    if (outcome.state == State.NONE) {
                         resumeAfter = false;
                     }
                     applyOutcome(outcome);
                 }, error -> applyOutcome(Outcome.progress(id)));
+    }
+
+    private void cancelOthersAndSubmit() {
+        if (media == null || isRunning(workDisposable)) {
+            return;
+        }
+        stopPolling();
+        jobId = null;
+        state = State.PROGRESS;
+        pauseForWork();
+        showProgress(null);
+        final FeedMedia target = media;
+        runWork(() -> {
+            try {
+                TranscriptionClient.fromPreferences().cancelAll();
+            } catch (TranscriptionException e) {
+                Log.e(TAG, Log.getStackTraceString(e));
+                return Outcome.failed(describe(e), Retry.BUSY);
+            }
+            return submit(target);
+        });
     }
 
     private void startDownload() {
